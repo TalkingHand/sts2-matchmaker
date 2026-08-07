@@ -1,4 +1,5 @@
 using Godot;
+using Sts2Matchmaker.Localization;
 
 namespace Sts2Matchmaker.UI;
 
@@ -12,10 +13,10 @@ namespace Sts2Matchmaker.UI;
 /// </summary>
 public class JoinFailurePanel : Sts2ModalPanel
 {
-    public static void Show(string message, string title = "접속 실패")
+    public static void Show(string message, string? title = null)
     {
         var panel = new JoinFailurePanel();
-        panel.ShowAsModal(title, new Vector2(480f, 280f));
+        panel.ShowAsModal(title ?? Loc.Get("접속 실패"), new Vector2(480f, 280f));
         panel.ContentContainer.AddChild(new Label
         {
             Text = message,

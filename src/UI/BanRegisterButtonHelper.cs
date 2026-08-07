@@ -1,4 +1,5 @@
 using Godot;
+using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 
 namespace Sts2Matchmaker.UI;
@@ -20,7 +21,7 @@ internal static class BanRegisterButtonHelper
     public static void UpdateAppearance(Button button, ulong targetId, string registerTooltip)
     {
         bool isBanned = BanListStore.IsBanned(targetId);
-        Sts2ModalPanel.UpdateTextActionButtonText(button, isBanned ? "밴 해제" : "밴 등록");
-        button.TooltipText = isBanned ? "이 사람의 밴 등록을 취소합니다" : registerTooltip;
+        Sts2ModalPanel.UpdateTextActionButtonText(button, isBanned ? Loc.Get("밴 해제") : Loc.Get("밴 등록"));
+        button.TooltipText = isBanned ? Loc.Get("이 사람의 밴 등록을 취소합니다") : registerTooltip;
     }
 }

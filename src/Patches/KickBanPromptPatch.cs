@@ -9,6 +9,7 @@ using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect;
 using MegaCrit.Sts2.Core.Nodes.Screens.CustomRun;
+using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 using Sts2Matchmaker.UI;
 using Steamworks;
@@ -94,7 +95,7 @@ internal static class KickBanPromptShared
             MegaRichTextLabel? bodyLabel = verticalPopup?.GetNodeOrNull<MegaRichTextLabel>("%Description");
             if (bodyLabel != null)
             {
-                bodyLabel.Text = $"{bodyLabel.Text}\n호스트를 밴 하시겠습니까?";
+                bodyLabel.Text = $"{bodyLabel.Text}\n{Loc.Get("호스트를 밴 하시겠습니까?")}";
             }
 
             // The native "좋아요"/OK button (InitYesButton's GENERIC_POPUP.ok case, since Kicked isn't a
@@ -111,7 +112,7 @@ internal static class KickBanPromptShared
             // is hidden - same offsets vertical_popup.tscn gives YesButton (see reference/ui/vertical_popup.tscn),
             // same approach BanConfirmPanel's own Confirm button uses to sit in that exact slot.
             noButton.Visible = true;
-            noButton.SetText("밴 등록");
+            noButton.SetText(Loc.Get("밴 등록"));
             noButton.SetAnchorsPreset(Control.LayoutPreset.BottomRight);
             noButton.OffsetLeft = -180f;
             noButton.OffsetRight = 0f;

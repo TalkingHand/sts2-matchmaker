@@ -3,6 +3,7 @@ using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer.Game.Lobby;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 using Steamworks;
 
@@ -50,7 +51,7 @@ public class MatchConditionsWindow : Sts2ModalPanel
         // the painted popup_vertical.tres box our other dialogs use - see Sts2ModalPanel.ShowAsTabbedSettingsScreen.
         // Same three tabs as the main "매칭" window, so ban-list management and the mod-info readout are available
         // from in-lobby too, not just before hosting/joining.
-        VBoxContainer[] pages = panel.ShowAsTabbedSettingsScreen(new[] { "매칭 설정", "모드 정보", "밴 목록" });
+        VBoxContainer[] pages = panel.ShowAsTabbedSettingsScreen(new[] { Loc.Get("매칭 설정"), Loc.Get("모드 정보"), Loc.Get("밴 목록") });
 
         // ShowGameMode: false - StartRunLobby.GameMode has no setter, so it's genuinely fixed for this already-open
         // room. ShowMaxPlayers: true - unlike GameMode, this is NOT StartRunLobby.MaxPlayers (also fixed, the
@@ -65,8 +66,8 @@ public class MatchConditionsWindow : Sts2ModalPanel
         panel._conditions.LoadFrom(MatchSettingsStore.Load());
 
         panel._isOpenToMatching = ComputeIsOpenToMatching(lobby);
-        panel._confirmButton = panel.AddConfirmButton("매칭 시작", panel.OnTogglePressed);
-        panel._cancelButton = panel.AddCancelButton("매칭 취소", panel.OnTogglePressed);
+        panel._confirmButton = panel.AddConfirmButton(Loc.Get("매칭 시작"), panel.OnTogglePressed);
+        panel._cancelButton = panel.AddCancelButton(Loc.Get("매칭 취소"), panel.OnTogglePressed);
         // Reflects whichever state we actually started in, not just the freshly-opened case - re-opening this
         // window while a search from an earlier press is still active should show the cancel state immediately,
         // not the confirm state.
@@ -89,7 +90,7 @@ public class MatchConditionsWindow : Sts2ModalPanel
         // Reflects whatever state ApplyMatchingUiState just did above, for the same re-opening-mid-search reason.
         if (panel._isOpenToMatching)
         {
-            panel.SetBusyStatus("참가 상대를 기다리는 중");
+            panel.SetBusyStatus(Loc.Get("참가 상대를 기다리는 중"));
         }
 
         var modInfo = new ModInfoPanel();
@@ -162,13 +163,13 @@ public class MatchConditionsWindow : Sts2ModalPanel
             // This window only ever exists for a room that already exists (host already committed) - being open to
             // search here always genuinely means waiting for others to find and join it, unlike MatchmakingWindow's
             // own "매칭 시도 중" where the outcome (join vs host) isn't decided yet.
-            SetBusyStatus("참가 상대를 기다리는 중");
+            SetBusyStatus(Loc.Get("참가 상대를 기다리는 중"));
         }
         else
         {
             MatchLobbyTagging.RemoveFromSearch(lobbyId);
             Log.Info($"[sts2_matchmaker] Closed lobby {lobbyIdValue} from matchmaking search");
-            SetFinalStatus("매칭 취소됨");
+            SetFinalStatus(Loc.Get("매칭 취소됨"));
         }
         _isOpenToMatching = !_isOpenToMatching;
         ApplyMatchingUiState();

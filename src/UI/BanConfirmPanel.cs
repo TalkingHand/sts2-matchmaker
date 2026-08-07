@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using Sts2Matchmaker.Localization;
 
 namespace Sts2Matchmaker.UI;
 
@@ -20,9 +21,6 @@ namespace Sts2Matchmaker.UI;
 /// </summary>
 public class BanConfirmPanel : Sts2ModalPanel
 {
-    private const string OtherReasonLabel = "기타";
-    private const string BulletPrefix = "  •  "; // indented bullet glyph, not a literal "*" - see BuildBodyText
-
     // StyleBodyLabel's own default (BodyTheme.DefaultFontSize = 18, shared by every other window using it) reads
     // small next to StyleAsSettingsDropdown's native 28px, and next to plain body text elsewhere in the actual
     // game. 26 matches NVerticalPopup's own Description RichTextLabel exactly (reference/ui/vertical_popup.tscn) -
@@ -38,7 +36,7 @@ public class BanConfirmPanel : Sts2ModalPanel
         // smaller 18px text had. Still proportional (780/650 = 720/600 = 480/400 = 1.2), same reasoning as before:
         // a disproportionate box stretches popup_vertical.tres's border/corner detail unevenly. Best estimate,
         // not a measured value - may need another pass once seen live, same as every previous size change here.
-        panel.ShowAsModal(alsoKick ? "밴" : "밴 등록", new Vector2(780f, 650f));
+        panel.ShowAsModal(alsoKick ? Loc.Get("밴") : Loc.Get("밴 등록"), new Vector2(780f, 650f));
 
         // ShowAsModal's own scroll inset (40px each side) is a fixed pixel amount tuned for its original 480px
         // design width - at a wider box that's proportionally thinner, which is what made everything look packed
@@ -59,15 +57,16 @@ public class BanConfirmPanel : Sts2ModalPanel
         // CustomMinimumSize.Y = 64 to match MatchConditionsPanel's "커뮤니티명" input exactly (both go through the
         // same StyleInput(LineEdit) for color/border, but that doesn't touch size - this one had no explicit size
         // at all before, so it rendered at LineEdit's own default thin height instead of matching).
-        var customReasonInput = new LineEdit { PlaceholderText = "밴 사유를 입력하세요", Visible = false, CustomMinimumSize = new Vector2(0f, 64f) };
+        var customReasonInput = new LineEdit { PlaceholderText = Loc.Get("밴 사유를 입력하세요"), Visible = false, CustomMinimumSize = new Vector2(0f, 64f) };
         StyleInput(customReasonInput);
 
-        string[] reasonOptions = { "봇", "욕설", "잠수", OtherReasonLabel };
+        string otherReasonLabel = Loc.Get("기타");
+        string[] reasonOptions = { Loc.Get("봇"), Loc.Get("욕설"), Loc.Get("잠수"), otherReasonLabel };
         string selectedReason = reasonOptions[0];
         void OnReasonSelected(string value)
         {
             selectedReason = value;
-            customReasonInput.Visible = value == OtherReasonLabel;
+            customReasonInput.Visible = value == otherReasonLabel;
         }
 
         // Sts2NativeDropdown reuses the game's own real settings_dropdown.tscn/language_dropdown_item.tscn (see
@@ -86,7 +85,7 @@ public class BanConfirmPanel : Sts2ModalPanel
         // Placed above the confirmation question (not below) - the dropdown's own open/close popover expands
         // downward over whatever comes after it, so putting it first keeps that popover clear of the body text
         // instead of overlapping it.
-        content.AddChild(BuildSettingsRow("밴 사유", reasonControl));
+        content.AddChild(BuildSettingsRow(Loc.Get("밴 사유"), reasonControl));
         content.AddChild(new Control { CustomMinimumSize = new Vector2(0f, 12f) });
         content.AddChild(customReasonInput);
 
@@ -111,9 +110,9 @@ public class BanConfirmPanel : Sts2ModalPanel
         // from the popup's bottom edge (offset_bottom = -80) - that's the real native placement for this exact
         // button, not an approximation, and abandon_run_yes_button.tscn's own custom_minimum_size (180x72) is what
         // OffsetLeft/OffsetTop derive from here.
-        Control confirmButton = panel.AddPopupYesButton("확인", () =>
+        Control confirmButton = panel.AddPopupYesButton(Loc.Get("확인"), () =>
         {
-            string reason = selectedReason == OtherReasonLabel ? customReasonInput.Text : selectedReason;
+            string reason = selectedReason == otherReasonLabel ? customReasonInput.Text : selectedReason;
             NModalContainer.Instance?.Clear();
             onConfirmed(reason);
         });
@@ -138,19 +137,15 @@ public class BanConfirmPanel : Sts2ModalPanel
         return wrapper;
     }
 
-    /// <summary>Builds the multi-line body text with real bullet glyphs (BulletPrefix) instead of a literal "*" -
-    /// the asterisks in the originally-specified copy were meant to mark list items, not to be read as literal
-    /// characters, so a plain Label (no BBCode list support needed) with an indented "•" prefix on each list line
-    /// reproduces that intent directly.</summary>
+    /// <summary>Builds the multi-line body text with real bullet glyphs baked into each localized template
+    /// (Loc.cs's assets/localization.json) instead of a literal "*" - the asterisks in the originally-specified
+    /// copy were meant to mark list items, not to be read as literal characters, so a plain Label (no BBCode list
+    /// support needed) with an indented "•" prefix on each list line reproduces that intent directly.</summary>
     private static string BuildBodyText(string targetLabel, bool alsoKick)
     {
-        return alsoKick
-            ? $"정말로 {targetLabel}님을 밴하시겠습니까?\n\n" +
-              $"{BulletPrefix}해당 계정은 이 로비에서 즉시 강퇴됩니다.\n" +
-              $"{BulletPrefix}밴 등록시 해당 계정과 더 이상 매칭되거나 멀티 플레이를 함께 진행할 수 없습니다.\n" +
-              $"{BulletPrefix}이 설정은 차후 밴 목록에서 해제할 수 있습니다."
-            : $"정말로 {targetLabel}님을 밴 등록하시겠습니까?\n\n" +
-              $"{BulletPrefix}밴 등록시 해당 계정과 더 이상 매칭되거나 멀티 플레이를 함께 진행할 수 없습니다.\n" +
-              $"{BulletPrefix}이 설정은 차후 밴 목록에서 해제할 수 있습니다.";
+        string template = alsoKick
+            ? Loc.Get("정말로 {0}님을 밴하시겠습니까?\n\n  •  해당 계정은 이 로비에서 즉시 강퇴됩니다.\n  •  밴 등록시 해당 계정과 더 이상 매칭되거나 멀티 플레이를 함께 진행할 수 없습니다.\n  •  이 설정은 차후 밴 목록에서 해제할 수 있습니다.")
+            : Loc.Get("정말로 {0}님을 밴 등록하시겠습니까?\n\n  •  밴 등록시 해당 계정과 더 이상 매칭되거나 멀티 플레이를 함께 진행할 수 없습니다.\n  •  이 설정은 차후 밴 목록에서 해제할 수 있습니다.");
+        return string.Format(template, targetLabel);
     }
 }

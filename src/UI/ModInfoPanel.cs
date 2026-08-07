@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using MegaCrit.Sts2.Core.Modding;
+using Sts2Matchmaker.Localization;
 
 namespace Sts2Matchmaker.UI;
 
@@ -18,7 +19,7 @@ public class ModInfoPanel : VBoxContainer
     {
         var hintLabel = Sts2ModalPanel.StyleBodyLabel(new Label
         {
-            Text = "매칭 시 상대방과 비교되는, 게임플레이에 영향을 주는 모드만 표시됩니다.",
+            Text = Loc.Get("매칭 시 상대방과 비교되는, 게임플레이에 영향을 주는 모드만 표시됩니다."),
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
         });
         AddChild(hintLabel);
@@ -37,7 +38,7 @@ public class ModInfoPanel : VBoxContainer
         List<string>? mods = ModManager.GetGameplayRelevantModNameList();
         if (mods == null || mods.Count == 0)
         {
-            return "게임플레이에 영향을 주는 모드가 설치되어 있지 않습니다 (언모드 상태).";
+            return Loc.Get("게임플레이에 영향을 주는 모드가 설치되어 있지 않습니다 (언모드 상태).");
         }
         return string.Join("\n", mods.OrderBy(m => m));
     }

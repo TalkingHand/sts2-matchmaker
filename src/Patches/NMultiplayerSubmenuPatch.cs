@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
 using MegaCrit.Sts2.addons.mega_text;
+using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.UI;
 
 namespace Sts2Matchmaker.Patches;
@@ -77,11 +78,11 @@ public static class NMultiplayerSubmenuPatch
                 ApplyHoverOverlay(button, icon);
             }
 
-            button.GetNodeOrNull<MegaLabel>("%Title")?.SetTextAutoSize("매칭");
+            button.GetNodeOrNull<MegaLabel>("%Title")?.SetTextAutoSize(Loc.Get("매칭"));
             MegaRichTextLabel? description = button.GetNodeOrNull<MegaRichTextLabel>("%Description");
             if (description != null)
             {
-                description.Text = "조건에 맞는 상대와 매칭합니다.";
+                description.Text = Loc.Get("조건에 맞는 상대와 매칭합니다.");
             }
 
             button.Connect(NClickableControl.SignalName.Released, Callable.From<NClickableControl>(_ =>

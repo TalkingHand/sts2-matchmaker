@@ -6,6 +6,7 @@ using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
+using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 using Steamworks;
 
@@ -62,7 +63,7 @@ public class MatchmakingWindow : Sts2ModalPanel
         // Ban list used to be its own popup (closing this window to open it, since only one modal can be open at
         // once) and the mod list was a show/hide toggle at the bottom of the conditions form - both are now just
         // tabs, so switching to them no longer interrupts an in-progress search/host flow.
-        VBoxContainer[] pages = panel.ShowAsTabbedSettingsScreen(new[] { "매칭 설정", "모드 정보", "밴 목록" });
+        VBoxContainer[] pages = panel.ShowAsTabbedSettingsScreen(new[] { Loc.Get("매칭 설정"), Loc.Get("모드 정보"), Loc.Get("밴 목록") });
         panel.BuildContent(pages[0]);
 
         var modInfo = new ModInfoPanel();
@@ -80,12 +81,9 @@ public class MatchmakingWindow : Sts2ModalPanel
         page.AddChild(_conditions);
         _conditions.Build();
 
-        _canHostCheck = new CheckBox
-        {
-            TooltipText = "해제 시 참가만 시도하고, 못 찾으면 계속 대기합니다.",
-        };
+        _canHostCheck = new CheckBox();
         StyleAsSettingsCheckbox(_canHostCheck);
-        page.AddChild(BuildSettingsRow("호스트 허용", _canHostCheck));
+        page.AddChild(BuildSettingsRow(Loc.Get("호스트 허용"), _canHostCheck, tooltip: Loc.Get("일치하는 로비가 없으면 자동으로 호스트가 됩니다."), overlayParent: this));
         page.AddChild(BuildSettingsDivider());
 
         MatchSettings saved = MatchSettingsStore.Load();
@@ -100,14 +98,14 @@ public class MatchmakingWindow : Sts2ModalPanel
         // 320x64 - FeedbackButton's own exact native size, not a shrunk-down guess. The texture's real aspect
         // ratio only renders correctly (via KeepAspectCentered) when the box it's centered in is close to that
         // same aspect - an arbitrarily smaller/narrower box was the other half of why this looked "off".
-        _rehostWaitButton = BuildSettingsActionButton("대기", new Vector2(320f, 64f));
+        _rehostWaitButton = BuildSettingsActionButton(Loc.Get("대기"), new Vector2(320f, 64f));
         WireHoverBrightness(_rehostWaitButton);
         _rehostWaitButton.Pressed += OnRehostWaitPressed;
-        page.AddChild(BuildSettingsRow("이어하기", _rehostWaitButton));
+        page.AddChild(BuildSettingsRow(Loc.Get("이어하기"), _rehostWaitButton, tooltip: Loc.Get("이 모드를 설치한 호스트가 중단된 멀티플레이 런을 다시 열면 자동으로 접속합니다."), overlayParent: this));
         page.AddChild(BuildSettingsDivider());
 
-        _confirmButton = AddConfirmButton("매칭 시작", OnConfirmPressed);
-        _cancelButton = AddCancelButton("매칭 취소", OnCancelPressed);
+        _confirmButton = AddConfirmButton(Loc.Get("매칭 시작"), OnConfirmPressed);
+        _cancelButton = AddCancelButton(Loc.Get("매칭 취소"), OnCancelPressed);
 
         // Top-level (not part of the scrollable page) so it stays visible above ContentBlocker instead of being
         // dimmed along with the conditions/rehost row it's reporting status for. StyleSettingsRowLabel (28px cream
@@ -187,7 +185,7 @@ public class MatchmakingWindow : Sts2ModalPanel
         // (join vs host) isn't known yet at the moment this is set - "참가 상대를 기다리는 중" belongs only to
         // MatchConditionsWindow, where a room already exists and being open-to-search genuinely means waiting for
         // others to join it.
-        SetBusyStatus("매칭 시도 중");
+        SetBusyStatus(Loc.Get("매칭 시도 중"));
         ApplyPendingUiState();
         _ = AutoMatchAsync(_pendingCts.Token);
     }
@@ -196,7 +194,7 @@ public class MatchmakingWindow : Sts2ModalPanel
     {
         _pendingCts?.Cancel();
         _pendingCts = null;
-        SetFinalStatus("매칭 취소됨");
+        SetFinalStatus(Loc.Get("매칭 취소됨"));
         ApplyPendingUiState();
     }
 
@@ -220,7 +218,7 @@ public class MatchmakingWindow : Sts2ModalPanel
             Log.Error($"[sts2_matchmaker] Unhandled exception during auto-match: {ex}");
             if (IsInstanceValid(this))
             {
-                SetFinalStatus($"매칭 중 예외: {ex.Message}");
+                SetFinalStatus(string.Format(Loc.Get("매칭 중 예외: {0}"), ex.Message));
             }
         }
         finally
@@ -243,7 +241,7 @@ public class MatchmakingWindow : Sts2ModalPanel
         switch (result.Outcome)
         {
             case AutoMatchOutcome.JoinExisting:
-                SetBusyStatus("발견된 로비에 접속 중");
+                SetBusyStatus(Loc.Get("발견된 로비에 접속 중"));
                 _ = JoinAsync(result.LobbyId!.Value);
                 break;
             case AutoMatchOutcome.BecameHost:
@@ -252,7 +250,7 @@ public class MatchmakingWindow : Sts2ModalPanel
                 break;
             case AutoMatchOutcome.Error:
             default:
-                SetFinalStatus(result.Error ?? "매칭 실패");
+                SetFinalStatus(result.Error ?? Loc.Get("매칭 실패"));
                 break;
         }
     }
@@ -267,7 +265,7 @@ public class MatchmakingWindow : Sts2ModalPanel
         }
         SaveCurrentSettings();
         _pendingCts = new CancellationTokenSource();
-        SetBusyStatus("팀원이 이어하기를 열 때까지 대기 중");
+        SetBusyStatus(Loc.Get("팀원이 이어하기를 열 때까지 대기 중"));
         ApplyPendingUiState();
         _ = RehostWaitAsync(_pendingCts.Token);
     }
@@ -279,7 +277,7 @@ public class MatchmakingWindow : Sts2ModalPanel
             AutoMatchResult result = await AutoMatchService.WaitForRehostAsync(cancelToken);
             if (IsInstanceValid(this) && result.Outcome == AutoMatchOutcome.JoinExisting)
             {
-                SetBusyStatus("이어하기 로비 발견, 접속 중");
+                SetBusyStatus(Loc.Get("이어하기 로비 발견, 접속 중"));
                 _ = JoinAsync(result.LobbyId!.Value);
             }
         }
@@ -292,7 +290,7 @@ public class MatchmakingWindow : Sts2ModalPanel
             Log.Error($"[sts2_matchmaker] Unhandled exception during rehost wait: {ex}");
             if (IsInstanceValid(this))
             {
-                SetFinalStatus($"이어하기 대기 중 예외: {ex.Message}");
+                SetFinalStatus(string.Format(Loc.Get("이어하기 대기 중 예외: {0}"), ex.Message));
             }
         }
         finally
@@ -318,7 +316,7 @@ public class MatchmakingWindow : Sts2ModalPanel
         catch (Exception ex)
         {
             Log.Error($"[sts2_matchmaker] Failed to join lobby {lobbyId.m_SteamID}: {ex}");
-            JoinFailurePanel.Show($"로비 참가에 실패했습니다.\n\n{ex.Message}");
+            JoinFailurePanel.Show(string.Format(Loc.Get("로비 참가에 실패했습니다.\n\n{0}"), ex.Message));
         }
     }
 }

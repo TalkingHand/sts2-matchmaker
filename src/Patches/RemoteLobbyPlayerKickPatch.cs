@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Multiplayer.Game.Lobby;
 using MegaCrit.Sts2.Core.Nodes.Multiplayer;
+using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 using Sts2Matchmaker.UI;
 using Steamworks;
@@ -84,8 +85,8 @@ public static class RemoteLobbyPlayerKickPatch
             {
                 var hostService = (INetHostGameService)lobby.NetService;
 
-                Button kickButton = Sts2ModalPanel.BuildTextActionButton("킥", buttonHeight, explicitColor: buttonColor);
-                kickButton.TooltipText = "킥 (밴 없이 내보내기만)";
+                Button kickButton = Sts2ModalPanel.BuildTextActionButton(Loc.Get("킥"), buttonHeight, explicitColor: buttonColor);
+                kickButton.TooltipText = Loc.Get("킥 (밴 없이 내보내기만)");
                 kickButton.Pressed += () =>
                 {
                     Log.Info($"[sts2_matchmaker] Kicking peer {peerId} from lobby UI");
@@ -93,8 +94,8 @@ public static class RemoteLobbyPlayerKickPatch
                 };
                 moderationRow.AddChild(kickButton);
 
-                Button banButton = Sts2ModalPanel.BuildTextActionButton("밴", buttonHeight, explicitColor: buttonColor);
-                banButton.TooltipText = "밴 (즉시 킥 + 밴 목록 등록)";
+                Button banButton = Sts2ModalPanel.BuildTextActionButton(Loc.Get("밴"), buttonHeight, explicitColor: buttonColor);
+                banButton.TooltipText = Loc.Get("밴 (즉시 킥 + 밴 목록 등록)");
                 banButton.Pressed += () =>
                 {
                     // Empty nickname is stored as-is (see BanListStore.ResolveNickname) so a later BanListPanel
@@ -120,8 +121,8 @@ public static class RemoteLobbyPlayerKickPatch
             {
                 // Register-only ("밴 등록"/"밴 해제" toggle) - a host already has "밴" for kick+register in one
                 // action, so showing this too would just be a redundant second way to do a subset of that.
-                const string registerTooltip = "밴 등록 (지금 킥하지 않고, 다음부터 매칭 제외)";
-                Button registerButton = Sts2ModalPanel.BuildTextActionButton("밴 등록", buttonHeight, explicitColor: buttonColor);
+                string registerTooltip = Loc.Get("밴 등록 (지금 킥하지 않고, 다음부터 매칭 제외)");
+                Button registerButton = Sts2ModalPanel.BuildTextActionButton(Loc.Get("밴 등록"), buttonHeight, explicitColor: buttonColor);
                 registerButton.Pressed += () =>
                 {
                     if (BanListStore.IsBanned(peerId))
