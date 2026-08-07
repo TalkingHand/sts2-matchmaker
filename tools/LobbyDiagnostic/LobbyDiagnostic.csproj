@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GameDataDir Condition="'$(GameDataDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2\data_sts2_windows_x86_64</GameDataDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Steamworks.NET">
+      <HintPath>$(GameDataDir)\Steamworks.NET.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Native Steamworks lib the managed wrapper P/Invokes into - must sit next to our exe. -->
+    <None Include="$(GameDataDir)\steam_api64.dll" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Tells the Steam client which app we're acting as (STS2's AppID), so RequestLobbyList sees its lobbies. -->
+    <None Include="steam_appid.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

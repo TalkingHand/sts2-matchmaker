@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <!-- Must exactly match mod_manifest.json's "id" - the mod loader loads "<mods_dir>/<id>/<id>.dll" verbatim. -->
+    <AssemblyName>sts2_matchmaker</AssemblyName>
+    <RootNamespace>Sts2Matchmaker</RootNamespace>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <!-- Slay the Spire 2's managed assemblies folder. Override with -p:GameDataDir=... if installed elsewhere. -->
+    <GameDataDir Condition="'$(GameDataDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2\data_sts2_windows_x86_64</GameDataDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- tools/ holds its own standalone csproj (LobbyDiagnostic); keep its sources/obj out of our default glob. -->
+    <Compile Remove="tools\**\*.cs" />
+    <None Remove="tools\**" />
+    <!-- reference/ is decompiled game source (ilspycmd/GDRE output) kept for lookup only - it uses compiler-internal
+         types (e.g. ILSpy's synthesized <>z__ReadOnlySingleElementList<>) that don't exist outside the game's own
+         assembly, so including it in our compile fails outright. Never meant to build, just to read. -->
+    <Compile Remove="reference\**\*.cs" />
+    <None Remove="reference\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- All of these are already loaded by the game process at runtime, so never copy them into our own output. -->
+    <Reference Include="GodotSharp">
+      <HintPath>$(GameDataDir)\GodotSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="sts2">
+      <HintPath>$(GameDataDir)\sts2.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Steamworks.NET">
+      <HintPath>$(GameDataDir)\Steamworks.NET.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GameDataDir)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!-- Game install root (one level up from GameDataDir) - where the "mods" folder next to SlayTheSpire2.exe lives. -->
+    <GameRootDir Condition="'$(GameRootDir)' == ''">$([System.IO.Path]::GetFullPath('$(GameDataDir)\..'))</GameRootDir>
+    <!-- Deploys straight into the Google Drive-synced folder instead of the real mods folder directly, so every
+         build automatically propagates to anyone else syncing that same Drive folder. The game's own
+         "mods\sts2_matchmaker" is a directory symlink pointing here (see setup below), so local testing on this
+         machine still works unchanged - override with -p:ModDeployDir=... to deploy elsewhere. -->
+    <ModDeployDir Condition="'$(ModDeployDir)' == ''">G:\내 드라이브\sts2matchmaker</ModDeployDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Runtime assets (icons, etc) loaded via Image.LoadFromFile from the mod's own directory at runtime - not
+         compiled resources, just plain files that ride along next to the DLL. Put new PNGs here. -->
+    <ModAsset Include="assets\**\*.*" />
+  </ItemGroup>
+
+  <!-- Copies the built dll/pdb + manifest + assets into ModDeployDir after every build, so relaunching the game (or
+       just restarting it) always picks up the latest code without a manual copy step. -->
+  <Target Name="DeployToMods" AfterTargets="Build">
+    <MakeDir Directories="$(ModDeployDir)" Condition="!Exists('$(ModDeployDir)')" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(ModDeployDir)" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).pdb" DestinationFolder="$(ModDeployDir)" Condition="Exists('$(OutputPath)$(AssemblyName).pdb')" />
+    <Copy SourceFiles="mod_manifest.json" DestinationFolder="$(ModDeployDir)" />
+    <Copy SourceFiles="@(ModAsset)" DestinationFolder="$(ModDeployDir)\assets\%(RecursiveDir)" Condition="'@(ModAsset)' != ''" />
+    <Message Importance="high" Text="Deployed sts2_matchmaker to $(ModDeployDir)" />
+  </Target>
+
+</Project>

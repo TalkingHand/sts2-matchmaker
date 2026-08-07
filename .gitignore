@@ -1,0 +1,15 @@
+# 빌드 산출물
+bin/
+obj/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+
+# 로컬 전용 설정 (프로젝트 공용 .claude/settings.json 은 추적)
+.claude/settings.local.json
+
+# 게임 디컴파일 참고 자료 (ilspycmd/GDRE 산출물 - 저작권 있는 게임 코드/에셋, 커밋/푸시 대상 아님)
+reference/
