@@ -5,6 +5,7 @@ using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Multiplayer.Game.Lobby;
 using MegaCrit.Sts2.Core.Nodes.Multiplayer;
+using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 using Steamworks;
 
@@ -111,7 +112,7 @@ public static class RecruitToggleInjector
             // where this row is visible AND a search is live at the same time to reflect in the first place. A
             // label that flips to "매칭 취소" but doesn't actually cancel anything when clicked (it just reopens
             // the same window, same as every other press) was just confusing without adding real function.
-            toggleLabel.Text = "매칭";
+            toggleLabel.Text = Loc.Get("매칭");
             toggleButton.Pressed += () => MatchConditionsWindow.ShowFor(lobby);
 
             // Keep the ascension tag honest as people come and go. StartRunLobby.MaxAscension is the minimum unlocked

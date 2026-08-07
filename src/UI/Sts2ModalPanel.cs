@@ -10,6 +10,7 @@ using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Screens.Settings;
 using MegaCrit.Sts2.Core.Nodes.Screens.ScreenContext;
+using Sts2Matchmaker.Localization;
 
 namespace Sts2Matchmaker.UI;
 
@@ -569,7 +570,7 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
         catch (Exception ex)
         {
             Log.Error($"[sts2_matchmaker] Failed to build NBackButton close control, falling back to a plain button: {ex}");
-            var fallback = new Button { Text = "닫기" };
+            var fallback = new Button { Text = Loc.Get("닫기") };
             fallback.Pressed += PlayClickSfx;
             fallback.SetAnchorsPreset(LayoutPreset.BottomWide);
             fallback.OffsetTop = -50f;

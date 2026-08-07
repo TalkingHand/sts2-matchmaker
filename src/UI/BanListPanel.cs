@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using MegaCrit.Sts2.Core.Multiplayer.Game.Lobby;
+using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 using Steamworks;
 
@@ -31,7 +32,7 @@ public class BanListPanel : VBoxContainer
 
     public void Build()
     {
-        AddChild(Sts2ModalPanel.StyleBodyLabel(new Label { Text = "밴 목록:" }));
+        AddChild(Sts2ModalPanel.StyleBodyLabel(new Label { Text = Loc.Get("밴 목록:") }));
 
         _listContainer = new VBoxContainer();
         AddChild(_listContainer);
@@ -49,7 +50,7 @@ public class BanListPanel : VBoxContainer
         Dictionary<ulong, BanListStore.BanEntry> bans = BanListStore.Load();
         if (bans.Count == 0)
         {
-            _listContainer.AddChild(Sts2ModalPanel.StyleBodyLabel(new Label { Text = "밴 목록이 비어있습니다." }));
+            _listContainer.AddChild(Sts2ModalPanel.StyleBodyLabel(new Label { Text = Loc.Get("밴 목록이 비어있습니다.") }));
             return;
         }
         foreach ((ulong steamId, BanListStore.BanEntry entry) in bans.OrderBy(kv => kv.Key))
@@ -74,7 +75,7 @@ public class BanListPanel : VBoxContainer
 
             // Same look as the other two "밴 해제" buttons (RemoteLobbyPlayerKickPatch's in-lobby toggle,
             // RunHistoryPlayerBanPatch's) - explicit red BuildTextActionButton, not a generic StyleAsSettingsButton.
-            Button removeButton = Sts2ModalPanel.BuildTextActionButton("밴 해제", 50f, explicitColor: new Color("991816"));
+            Button removeButton = Sts2ModalPanel.BuildTextActionButton(Loc.Get("밴 해제"), 50f, explicitColor: new Color("991816"));
             removeButton.Pressed += () =>
             {
                 BanListStore.Remove(steamId);

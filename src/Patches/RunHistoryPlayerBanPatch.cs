@@ -4,6 +4,7 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 using MegaCrit.Sts2.Core.Runs;
+using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 using Sts2Matchmaker.UI;
 using Steamworks;
@@ -40,7 +41,7 @@ public static class RunHistoryPlayerBanPatch
     private const float Gap = 16f;
 
     private const string BanButtonName = "Sts2MatchmakerRunHistoryBanButton";
-    private const string RegisterTooltip = "현재 보고 있는 플레이어 밴 등록";
+    private static string RegisterTooltip => Loc.Get("현재 보고 있는 플레이어 밴 등록");
 
     [HarmonyPatch("_Ready")]
     [HarmonyPostfix]
@@ -53,7 +54,7 @@ public static class RunHistoryPlayerBanPatch
             // against StyleBoxFlat's flat fill. BuildTextActionButton, same as RemoteLobbyPlayerKickPatch's own
             // "밴 등록" button - this is the same register-only, no-kick action, just triggered from a different
             // screen, and BanRegisterButtonHelper sets its actual "밴 등록"/"밴 해제" text below.
-            Button banButton = Sts2ModalPanel.BuildTextActionButton("밴 등록", 50f, explicitColor: new Color("991816"));
+            Button banButton = Sts2ModalPanel.BuildTextActionButton(Loc.Get("밴 등록"), 50f, explicitColor: new Color("991816"));
             // Named for lookup from SelectPlayerPostfix below (a separate Harmony postfix, so it can't just close
             // over this local variable) - same "find our own injected node by name" idea RecruitToggleInjector uses.
             banButton.Name = BanButtonName;

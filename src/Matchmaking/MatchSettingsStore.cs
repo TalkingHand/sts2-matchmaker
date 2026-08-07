@@ -24,7 +24,7 @@ public static class MatchSettingsStore
         }
 
         settings.Community = (string)config.GetValue(Section, "community", settings.Community);
-        settings.Language = (string)config.GetValue(Section, "language", settings.Language);
+        // Language is deliberately NOT loaded here - see MatchSettings.Language's own doc.
         settings.MaxPlayers = (int)config.GetValue(Section, "max_players", settings.MaxPlayers);
         settings.RequireModMatch = (bool)config.GetValue(Section, "require_mod_match", settings.RequireModMatch);
         settings.CanHost = (bool)config.GetValue(Section, "can_host", settings.CanHost);
@@ -38,7 +38,7 @@ public static class MatchSettingsStore
         var config = new ConfigFile();
         config.Load(ConfigPath); // best-effort - keep any unrelated sections if the file already exists
         config.SetValue(Section, "community", settings.Community);
-        config.SetValue(Section, "language", settings.Language);
+        // Language is deliberately NOT saved here - see MatchSettings.Language's own doc.
         config.SetValue(Section, "max_players", settings.MaxPlayers);
         config.SetValue(Section, "require_mod_match", settings.RequireModMatch);
         config.SetValue(Section, "can_host", settings.CanHost);
