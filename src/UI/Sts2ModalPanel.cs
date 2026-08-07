@@ -537,6 +537,19 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
 
     private void AddCloseButton()
     {
+        CloseButton = BuildCloseButton(this, OnCloseRequested);
+    }
+
+    /// <summary>
+    /// AddCloseButton's own body, extracted as a static helper so non-Sts2ModalPanel callers - e.g.
+    /// KickBanPromptPatch augmenting a native NErrorPopup, which is also a FullRect Control at origin (see
+    /// error_popup.tscn's root, anchors_preset=15) but isn't one of our own panels - can attach the exact same
+    /// native close control instead of hand-rolling a second copy of this fallback/positioning logic.
+    /// fullRectParent must span the full window at origin for the same reason AddCloseButton's own doc requires
+    /// it of "this": NBackButton computes its own on-screen position from the window's size, not its parent's.
+    /// </summary>
+    internal static NBackButton? BuildCloseButton(Control fullRectParent, Action onClose)
+    {
         try
         {
             PackedScene? scene = PreloadManager.Cache.GetScene(BackButtonScenePath);
@@ -545,10 +558,10 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
                 throw new InvalidOperationException($"GetScene returned null for {BackButtonScenePath}");
             }
             var backButton = scene.Instantiate<NBackButton>(PackedScene.GenEditState.Disabled);
-            backButton.Connect(NClickableControl.SignalName.Released, Callable.From<NClickableControl>(_ => OnCloseRequested()));
-            AddChild(backButton);
+            backButton.Connect(NClickableControl.SignalName.Released, Callable.From<NClickableControl>(_ => onClose()));
+            fullRectParent.AddChild(backButton);
             backButton.Enable();
-            CloseButton = backButton;
+            return backButton;
         }
         catch (Exception ex)
         {
@@ -561,8 +574,9 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
             fallback.OffsetLeft = 60f;
             fallback.OffsetRight = -60f;
             fallback.AddThemeColorOverride("font_color", StsColors.cream);
-            fallback.Pressed += OnCloseRequested;
-            AddChild(fallback);
+            fallback.Pressed += onClose;
+            fullRectParent.AddChild(fallback);
+            return null;
         }
     }
 
