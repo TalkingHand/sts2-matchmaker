@@ -80,12 +80,9 @@ public class MatchmakingWindow : Sts2ModalPanel
         page.AddChild(_conditions);
         _conditions.Build();
 
-        _canHostCheck = new CheckBox
-        {
-            TooltipText = "해제 시 참가만 시도하고, 못 찾으면 계속 대기합니다.",
-        };
+        _canHostCheck = new CheckBox();
         StyleAsSettingsCheckbox(_canHostCheck);
-        page.AddChild(BuildSettingsRow("호스트 허용", _canHostCheck));
+        page.AddChild(BuildSettingsRow("호스트 허용", _canHostCheck, tooltip: "일치하는 로비가 없으면 자동으로 호스트가 됩니다.", overlayParent: this));
         page.AddChild(BuildSettingsDivider());
 
         MatchSettings saved = MatchSettingsStore.Load();
@@ -103,7 +100,7 @@ public class MatchmakingWindow : Sts2ModalPanel
         _rehostWaitButton = BuildSettingsActionButton("대기", new Vector2(320f, 64f));
         WireHoverBrightness(_rehostWaitButton);
         _rehostWaitButton.Pressed += OnRehostWaitPressed;
-        page.AddChild(BuildSettingsRow("이어하기", _rehostWaitButton));
+        page.AddChild(BuildSettingsRow("이어하기", _rehostWaitButton, tooltip: "이 모드를 설치한 호스트가 중단된 멀티플레이 런을 다시 열면 자동으로 접속합니다.", overlayParent: this));
         page.AddChild(BuildSettingsDivider());
 
         _confirmButton = AddConfirmButton("매칭 시작", OnConfirmPressed);

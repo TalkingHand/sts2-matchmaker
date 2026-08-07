@@ -76,9 +76,13 @@ public class MatchConditionsPanel : VBoxContainer
     {
         // 320x64 - matches the native select rows' own settings_dropdown.tscn size, so this row's control column
         // lines up with every other row instead of looking noticeably narrower/shorter than its neighbors.
-        _communityInput = new LineEdit { PlaceholderText = "예: myguild", CustomMinimumSize = new Vector2(320f, 64f) };
+        _communityInput = new LineEdit
+        {
+            PlaceholderText = "예: myguild",
+            CustomMinimumSize = new Vector2(320f, 64f),
+        };
         Sts2ModalPanel.StyleInput(_communityInput);
-        AddChild(Sts2ModalPanel.BuildSettingsRow("커뮤니티명", _communityInput));
+        AddChild(Sts2ModalPanel.BuildSettingsRow("커뮤니티명", _communityInput, tooltip: "내용이 일치하는 대상과 매칭됩니다.", overlayParent: _overlayParent));
         AddChild(Sts2ModalPanel.BuildSettingsDivider());
 
         var languageOptions = new List<(string Label, string Value)> { ("언어 무관 (전체)", string.Empty) };

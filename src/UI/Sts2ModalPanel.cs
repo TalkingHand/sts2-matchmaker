@@ -1429,7 +1429,12 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
     /// actually renders - the "17" only ever briefly exists as a pre-adjustment placeholder value. Our own row
     /// titles are comparably short Korean phrases at the same row width, so 28 (not a full binary-search
     /// reimplementation) is the correct match here too.</summary>
-    internal static Control BuildSettingsRow(string title, Control control, int fontSize = 28)
+    /// <param name="overlayParent">Needed only when tooltip is set - see BuildCustomTooltipBox's own doc for why
+    /// a hand-built popup (not Control.TooltipText) is used, and why it needs a top-level parent to be added to
+    /// rather than living inside this row itself (same reparenting need Sts2NativeDropdown already has - a
+    /// Control positioned via SetGlobalPosition still gets clipped by an ancestor ScrollContainer if it's actually
+    /// a descendant of one, regardless of its own global coordinates).</param>
+    internal static Control BuildSettingsRow(string title, Control control, int fontSize = 28, string? tooltip = null, Control? overlayParent = null)
     {
         var margin = new MarginContainer { CustomMinimumSize = new Vector2(0f, 64f) };
         margin.AddThemeConstantOverride("margin_left", 12);
@@ -1442,7 +1447,102 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
         label.SetHSizeFlags(SizeFlags.ExpandFill);
         row.AddChild(label);
         row.AddChild(control);
+
+        if (tooltip != null)
+        {
+            // Label's own MouseFilter defaults to Ignore (it's not interactive), which would otherwise let hover
+            // pass straight through without ever registering as "over the label" at all - Stop is required for it
+            // to receive MouseEntered/Exited. The label/control pair together already span this row's full width
+            // (label is ExpandFill, so there's no dead zone between them) - wiring only "control" left the label
+            // half (the first place a reading-left-to-right mouse naturally lands) dead.
+            label.MouseFilter = MouseFilterEnum.Stop;
+            if (overlayParent != null)
+            {
+                // Anchored to the ROW's own position (not whichever of label/control triggered it) so the tooltip
+                // doesn't visibly jump depending on which half of the row the mouse happened to enter from.
+                Vector2 Position() => margin.GetGlobalRect().Position + new Vector2(0f, 68f);
+                WireCustomTooltip(label, tooltip, overlayParent, Position);
+                WireCustomTooltip(control, tooltip, overlayParent, Position);
+            }
+            else
+            {
+                // No overlay parent given - fall back to Godot's own cursor-following tooltip rather than
+                // silently showing nothing. Still functional, just not repositioned clear of the custom cursor.
+                label.TooltipText = tooltip;
+                control.TooltipText = tooltip;
+            }
+        }
+
         return margin;
+    }
+
+    /// <summary>
+    /// Small floating description box positioned at a fixed offset below the hovered row, not at the mouse cursor
+    /// - Control.TooltipText renders AT the cursor position, which sits directly under STS2's own custom cursor
+    /// graphic and is effectively invisible there. The native settings screen has this exact same fix baked in
+    /// (NCommonTooltipsHoverTip.OnHovered positions its own tooltip at "row's GlobalPosition + a fixed offset",
+    /// never at the mouse) - this reproduces that same idea with our own box, not the native HoverTip/NHoverTipSet
+    /// system, since every HoverTip constructor requires a real LocString (a loc table entry from the game's own
+    /// localization files) and this mod has no way to register one without shipping a .pck (see
+    /// ModManager.GetModdedLocTables - it only looks at res://{modId}/localization/..., which is only populated
+    /// when mod_manifest.json's has_pck is true and a matching .pck is loaded).
+    /// </summary>
+    private static Control BuildCustomTooltipBox(string text)
+    {
+        var box = new PanelContainer { MouseFilter = MouseFilterEnum.Ignore };
+        var style = new StyleBoxFlat { BgColor = SettingsDropdownPanel, BorderColor = StsColors.gold };
+        style.SetCornerRadiusAll(8);
+        style.SetBorderWidthAll(2);
+        style.ContentMarginLeft = 14f;
+        style.ContentMarginRight = 14f;
+        style.ContentMarginTop = 10f;
+        style.ContentMarginBottom = 10f;
+        style.ShadowColor = new Color(0f, 0f, 0f, 0.5f);
+        style.ShadowSize = 6;
+        box.AddThemeStyleboxOverride("panel", style);
+
+        var label = StyleBodyLabel(new Label
+        {
+            Text = text,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            CustomMinimumSize = new Vector2(360f, 0f),
+            MouseFilter = MouseFilterEnum.Ignore,
+        });
+        label.AddThemeFontSizeOverride("font_size", 22);
+        box.AddChild(label);
+        return box;
+    }
+
+    /// <summary>Shows/hides a BuildCustomTooltipBox on hoverSource's own MouseEntered/Exited, added to
+    /// overlayParent (a top-level Control, clear of any ScrollContainer) and positioned via the given callback -
+    /// re-evaluated on every show rather than computed once, since the row's own on-screen position can change
+    /// (e.g. the page scrolling) between one hover and the next.</summary>
+    private static void WireCustomTooltip(Control hoverSource, string text, Control overlayParent, Func<Vector2> position)
+    {
+        Control? active = null;
+
+        void ShowTip()
+        {
+            if (active != null && GodotObject.IsInstanceValid(active))
+            {
+                return;
+            }
+            active = BuildCustomTooltipBox(text);
+            overlayParent.AddChild(active);
+            active.SetGlobalPosition(position());
+        }
+
+        void HideTip()
+        {
+            if (active != null && GodotObject.IsInstanceValid(active))
+            {
+                active.QueueFree();
+            }
+            active = null;
+        }
+
+        hoverSource.MouseEntered += ShowTip;
+        hoverSource.MouseExited += HideTip;
     }
 
     /// <summary>Thin divider between settings rows - settings_screen.tscn puts one of these between every single
