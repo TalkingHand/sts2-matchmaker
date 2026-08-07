@@ -7,9 +7,13 @@ public sealed class MatchSettings
 {
     public string Community = string.Empty;
 
-    /// <summary>Language to match on (single select, ISO 639-2 code) - empty means "no preference" and searches
-    /// without a language filter. MatchConditionsPanel defaults the dropdown to the game's current UI language on
-    /// first use, but this field itself carries whatever the player last explicitly picked.</summary>
+    /// <summary>
+    /// Language to match on (single select, ISO 639-2 code) - empty means "no preference" and searches without a
+    /// language filter. Not persisted via MatchSettingsStore (unlike most fields here) - MatchConditionsPanel
+    /// always defaults this to the game's current UI language fresh each time the window opens (see LoadFrom's
+    /// own doc), so it stays in sync with whatever language the player has the game itself set to, instead of
+    /// getting stuck reflecting whatever was picked in some earlier session under a different UI language.
+    /// </summary>
     public string Language = string.Empty;
 
     // Region search always starts close and automatically widens all the way to Worldwide if nothing's found (see

@@ -3,6 +3,7 @@ using System.Linq;
 using Godot;
 using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Runs;
+using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 
 namespace Sts2Matchmaker.UI;
@@ -78,14 +79,14 @@ public class MatchConditionsPanel : VBoxContainer
         // lines up with every other row instead of looking noticeably narrower/shorter than its neighbors.
         _communityInput = new LineEdit
         {
-            PlaceholderText = "예: myguild",
+            PlaceholderText = Loc.Get("예: myguild"),
             CustomMinimumSize = new Vector2(320f, 64f),
         };
         Sts2ModalPanel.StyleInput(_communityInput);
-        AddChild(Sts2ModalPanel.BuildSettingsRow("커뮤니티명", _communityInput, tooltip: "내용이 일치하는 대상과 매칭됩니다.", overlayParent: _overlayParent));
+        AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("커뮤니티명"), _communityInput, tooltip: Loc.Get("내용이 일치하는 대상과 매칭됩니다."), overlayParent: _overlayParent));
         AddChild(Sts2ModalPanel.BuildSettingsDivider());
 
-        var languageOptions = new List<(string Label, string Value)> { ("언어 무관 (전체)", string.Empty) };
+        var languageOptions = new List<(string Label, string Value)> { (Loc.Get("언어 무관 (전체)"), string.Empty) };
         string currentLanguage = LocManager.Instance?.Language ?? string.Empty;
         List<string> allLanguages = LocManager.Languages ?? new List<string>();
         foreach (string code in allLanguages)
@@ -94,7 +95,7 @@ public class MatchConditionsPanel : VBoxContainer
             languageOptions.Add((label, code));
         }
         _languageField = NativeDropdownField<string>.BuildOrFallback(languageOptions, currentLanguage, overlayParent: _overlayParent);
-        AddChild(Sts2ModalPanel.BuildSettingsRow("언어", _languageField.Control));
+        AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("언어"), _languageField.Control));
         AddChild(Sts2ModalPanel.BuildSettingsDivider());
 
         // Order from here down is deliberately 런 종류 -> 승천 단계 -> 인원 수 (then, outside this panel entirely,
@@ -104,12 +105,12 @@ public class MatchConditionsPanel : VBoxContainer
         {
             var gameModeOptions = new List<(string Label, GameMode Value)>
             {
-                ("스탠다드", GameMode.Standard),
-                ("데일리", GameMode.Daily),
-                ("커스텀", GameMode.Custom),
+                (Loc.Get("스탠다드"), GameMode.Standard),
+                (Loc.Get("데일리"), GameMode.Daily),
+                (Loc.Get("커스텀"), GameMode.Custom),
             };
             _gameModeField = NativeDropdownField<GameMode>.BuildOrFallback(gameModeOptions, GameMode.Standard, _ => UpdateMaxPlayersEnabled(), _overlayParent);
-            AddChild(Sts2ModalPanel.BuildSettingsRow("런 종류", _gameModeField.Control));
+            AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("런 종류"), _gameModeField.Control));
             AddChild(Sts2ModalPanel.BuildSettingsDivider());
         }
 
@@ -127,7 +128,7 @@ public class MatchConditionsPanel : VBoxContainer
             {
                 if (n > _currentLobbyPlayerCount)
                 {
-                    maxPlayersOptions.Add(($"{n}인", n));
+                    maxPlayersOptions.Add((string.Format(Loc.Get("{0}인"), n), n));
                 }
             }
             if (maxPlayersOptions.Count == 0)
@@ -138,7 +139,7 @@ public class MatchConditionsPanel : VBoxContainer
                 // anyway once the room's actually full (CheckPlayerLimitNow closes the search immediately).
                 for (int n = MatchHostService.MaxPlayers; n >= MatchHostService.MinPlayers; n--)
                 {
-                    maxPlayersOptions.Add(($"{n}인", n));
+                    maxPlayersOptions.Add((string.Format(Loc.Get("{0}인"), n), n));
                 }
             }
             // "무관" only when ShowGameMode - i.e. only in the host-capable main matching popup (MatchmakingWindow),
@@ -153,10 +154,10 @@ public class MatchConditionsPanel : VBoxContainer
             // by _currentLobbyPlayerCount above since it isn't a specific headcount to compare against that.
             if (ShowGameMode)
             {
-                maxPlayersOptions.Add(("무관", MatchTags.MaxPlayersAny));
+                maxPlayersOptions.Add((Loc.Get("무관"), MatchTags.MaxPlayersAny));
             }
             _maxPlayersField = NativeDropdownField<int>.BuildOrFallback(maxPlayersOptions, MatchHostService.DefaultMaxPlayers, overlayParent: _overlayParent);
-            AddChild(Sts2ModalPanel.BuildSettingsRow("인원 수", _maxPlayersField.Control));
+            AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("인원 수"), _maxPlayersField.Control));
             AddChild(Sts2ModalPanel.BuildSettingsDivider());
             UpdateMaxPlayersEnabled();
         }
@@ -187,11 +188,11 @@ public class MatchConditionsPanel : VBoxContainer
         var ascensionOptions = new List<(string Label, int Value)>();
         for (int level = maxAscension; level >= 0; level--)
         {
-            ascensionOptions.Add((level == 0 ? "승천 없음" : $"승천 {level}", level));
+            ascensionOptions.Add((level == 0 ? Loc.Get("승천 없음") : string.Format(Loc.Get("승천 {0}"), level), level));
         }
-        ascensionOptions.Add(("무관", MatchTags.AscensionAny));
+        ascensionOptions.Add((Loc.Get("무관"), MatchTags.AscensionAny));
         _ascensionField = NativeDropdownField<int>.BuildOrFallback(ascensionOptions, maxAscension, overlayParent: _overlayParent);
-        AddChild(Sts2ModalPanel.BuildSettingsRow("승천 단계", _ascensionField.Control));
+        AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("승천 단계"), _ascensionField.Control));
         AddChild(Sts2ModalPanel.BuildSettingsDivider());
     }
 
@@ -237,16 +238,15 @@ public class MatchConditionsPanel : VBoxContainer
         }
     }
 
-    /// <summary>Deliberately does NOT touch _ascensionField - see BuildAscensionRow's own doc for why that one
-    /// always keeps whatever fresh default Build() gave it (the player's current highest unlocked level) instead
-    /// of being restored from a previous session's saved settings.Ascension the way every other field here is.</summary>
+    /// <summary>Deliberately does NOT touch _languageField or _ascensionField - both always keep whatever fresh
+    /// default Build() gave them (the game's current UI language, and the player's current highest unlocked
+    /// ascension level, respectively) instead of being restored from a previous session's saved setting the way
+    /// every other field here is. For language specifically, this means switching the game's own UI language
+    /// always carries the matching-language filter along with it on the next open, rather than leaving it stuck
+    /// on whatever language happened to be current the last time it was explicitly picked.</summary>
     public void LoadFrom(MatchSettings settings)
     {
         _communityInput.Text = settings.Community;
-
-        // A stored code no longer in the list (or empty, meaning "no preference" was saved) resolves to "언어
-        // 무관" - NativeDropdownField.SetValue's own fallback-to-first-option rule handles that.
-        _languageField.SetValue(settings.Language);
 
         if (_gameModeField != null)
         {

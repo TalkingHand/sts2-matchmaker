@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.Nodes.Screens.CustomRun;
 using MegaCrit.Sts2.Core.Nodes.Screens.DailyRun;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
 using MegaCrit.Sts2.Core.Runs;
+using Sts2Matchmaker.Localization;
 using Steamworks;
 
 namespace Sts2Matchmaker.Matchmaking;
@@ -48,7 +49,7 @@ public static class MatchHostService
         (string? err, NetHostGameService? netService, CSteamID lobbyId) = await CreateAndTagLobbyAsync(communityName, language, gameMode, effectiveMaxPlayers, MatchTags.KindFresh, initialAscension);
         if (err != null || netService == null)
         {
-            return HostResult.Failure(err ?? "알 수 없는 오류");
+            return HostResult.Failure(err ?? Loc.Get("알 수 없는 오류"));
         }
 
         try
@@ -86,7 +87,7 @@ public static class MatchHostService
         {
             Log.Error($"[sts2_matchmaker] Exception pushing run screen: {ex}");
             netService.Disconnect(NetError.InternalError);
-            return HostResult.Failure($"매칭 설정 중 오류: {ex.Message}");
+            return HostResult.Failure(string.Format(Loc.Get("매칭 설정 중 오류: {0}"), ex.Message));
         }
     }
 
@@ -102,7 +103,7 @@ public static class MatchHostService
         if (err.HasValue)
         {
             Log.Error($"[sts2_matchmaker] StartSteamHost failed: {err.Value}");
-            return ($"호스트 시작 실패: {err.Value}", null, default);
+            return (string.Format(Loc.Get("호스트 시작 실패: {0}"), err.Value), null, default);
         }
 
         string? rawLobbyId = netService.GetRawLobbyIdentifier();
@@ -110,7 +111,7 @@ public static class MatchHostService
         {
             Log.Error("[sts2_matchmaker] StartSteamHost succeeded but returned no usable lobby id");
             netService.Disconnect(NetError.InternalError);
-            return ("로비 ID를 가져오지 못했습니다.", null, default);
+            return (Loc.Get("로비 ID를 가져오지 못했습니다."), null, default);
         }
 
         var lobbyId = new CSteamID(lobbyIdValue);
@@ -126,7 +127,7 @@ public static class MatchHostService
         {
             Log.Error($"[sts2_matchmaker] Exception tagging lobby: {ex}");
             netService.Disconnect(NetError.InternalError);
-            return ($"매칭 태그 설정 중 오류: {ex.Message}", null, default);
+            return (string.Format(Loc.Get("매칭 태그 설정 중 오류: {0}"), ex.Message), null, default);
         }
     }
 }

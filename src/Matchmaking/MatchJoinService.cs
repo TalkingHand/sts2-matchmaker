@@ -4,6 +4,7 @@ using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer.Connection;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
+using Sts2Matchmaker.Localization;
 using Steamworks;
 
 namespace Sts2Matchmaker.Matchmaking;
@@ -28,7 +29,7 @@ public static class MatchJoinService
         NMainMenu? mainMenu = NGame.Instance?.MainMenu;
         if (mainMenu == null)
         {
-            throw new InvalidOperationException("메인 메뉴를 찾을 수 없어 로비에 참가할 수 없습니다.");
+            throw new InvalidOperationException(Loc.Get("메인 메뉴를 찾을 수 없어 로비에 참가할 수 없습니다."));
         }
         await mainMenu.JoinGame(initializer);
 
@@ -42,7 +43,7 @@ public static class MatchJoinService
         // treat it as a failure - otherwise we'd close our UI and try to tag a lobby we never actually joined.
         if (stack.Peek() is NJoinFriendScreen or NMultiplayerSubmenu)
         {
-            throw new InvalidOperationException("로비 참가에 실패했습니다 (런이 이미 시작되었거나 참가가 취소됨).");
+            throw new InvalidOperationException(Loc.Get("로비 참가에 실패했습니다 (런이 이미 시작되었거나 참가가 취소됨)."));
         }
 
         // Reaching here means we're in - contribute our own ban list to this lobby's shared tag now that we're a
