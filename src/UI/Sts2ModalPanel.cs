@@ -43,6 +43,9 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
     private const string CheckboxTickedTexturePath = "res://images/atlases/ui_atlas.sprites/checkbox_ticked.tres";
     private const string CheckboxUntickedTexturePath = "res://images/atlases/ui_atlas.sprites/checkbox_unticked.tres";
     private const string SettingsTabScenePath = "res://scenes/screens/settings_tab.tscn";
+    // hover_tip.tscn's own "Bg"/"Shadow" NinePatchRect texture (see reference/ui/hover_tip.tscn) - the actual art
+    // the native HoverTip system paints its box with, not a hand-drawn StyleBoxFlat approximation.
+    private const string HoverTipBackgroundTexturePath = "res://images/ui/hover_tip.png";
 
     // Same FMOD event NButton.ClickedSfx plays from its own OnPress() (see reference/GodotExtensions/NButton.cs) -
     // every native control we reuse via PreloadManager (NBackButton, NConfirmButton, NPopupYesNoButton,
@@ -1460,9 +1463,18 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
             {
                 // Anchored to the ROW's own position (not whichever of label/control triggered it) so the tooltip
                 // doesn't visibly jump depending on which half of the row the mouse happened to enter from.
-                Vector2 Position() => margin.GetGlobalRect().Position + new Vector2(0f, 68f);
-                WireCustomTooltip(label, tooltip, overlayParent, Position);
-                WireCustomTooltip(control, tooltip, overlayParent, Position);
+                // Offset is settings_screen.tscn's own NSettingsScreen.settingTipsOffset (1012, -60) verbatim (see
+                // reference/Settings/NSettingsScreen.cs:153 and NCommonTooltipsHoverTip.cs's own OnHovered, which
+                // adds this exact offset to the hovered control's GlobalPosition) - NOT the "(0, 68), directly below
+                // the row" this used before, which is what actually put our tooltip at the row's bottom-left
+                // instead of matching native's "float in the empty space to the right of the panel" placement.
+                // Reusing the literal native numbers (rather than re-deriving new ones) is correct here for the
+                // same reason ShowAsTabbedSettingsScreen's own contentRoot doc gives for its 1012px column width:
+                // our tabbed settings screen is built at that exact same 1012px-wide centered design-pixel column,
+                // so a row at the same relative position ends up under the same transform native rows are.
+                Vector2 Position() => margin.GetGlobalRect().Position + new Vector2(1012f, -60f);
+                WireCustomTooltip(label, title, tooltip, overlayParent, Position);
+                WireCustomTooltip(control, title, tooltip, overlayParent, Position);
             }
             else
             {
@@ -1477,47 +1489,119 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
     }
 
     /// <summary>
-    /// Small floating description box positioned at a fixed offset below the hovered row, not at the mouse cursor
-    /// - Control.TooltipText renders AT the cursor position, which sits directly under STS2's own custom cursor
+    /// Small floating description box positioned at a fixed offset from the hovered row, not at the mouse cursor -
+    /// Control.TooltipText renders AT the cursor position, which sits directly under STS2's own custom cursor
     /// graphic and is effectively invisible there. The native settings screen has this exact same fix baked in
     /// (NCommonTooltipsHoverTip.OnHovered positions its own tooltip at "row's GlobalPosition + a fixed offset",
-    /// never at the mouse) - this reproduces that same idea with our own box, not the native HoverTip/NHoverTipSet
-    /// system, since every HoverTip constructor requires a real LocString (a loc table entry from the game's own
-    /// localization files) and this mod has no way to register one without shipping a .pck (see
-    /// ModManager.GetModdedLocTables - it only looks at res://{modId}/localization/..., which is only populated
-    /// when mod_manifest.json's has_pck is true and a matching .pck is loaded).
+    /// never at the mouse) - this reproduces that same idea with our own box built from hover_tip.tscn's real
+    /// layout/art (see reference/ui/hover_tip.tscn), not the native HoverTip/NHoverTipSet system itself, since
+    /// every HoverTip constructor requires a real LocString (a loc table entry from the game's own localization
+    /// files) and this mod has no way to register one without shipping a .pck (see ModManager.GetModdedLocTables -
+    /// it only looks at res://{modId}/localization/..., which is only populated when mod_manifest.json's has_pck is
+    /// true and a matching .pck is loaded).
+    /// Structure/colors/fonts below are copied field-for-field from hover_tip.tscn's own node tree (Bg/Shadow
+    /// NinePatchRect using images/ui/hover_tip.png, Title Label, Description RichTextLabel under a MarginContainer)
+    /// rather than a hand-drawn StyleBoxFlat box - the previous version approximated a rounded-rect panel with no
+    /// title, which is why it looked visibly different from the real in-game tooltip.
     /// </summary>
-    private static Control BuildCustomTooltipBox(string text)
+    private static Control BuildCustomTooltipBox(string title, string description)
     {
-        var box = new PanelContainer { MouseFilter = MouseFilterEnum.Ignore };
-        var style = new StyleBoxFlat { BgColor = SettingsDropdownPanel, BorderColor = StsColors.gold };
-        style.SetCornerRadiusAll(8);
-        style.SetBorderWidthAll(2);
-        style.ContentMarginLeft = 14f;
-        style.ContentMarginRight = 14f;
-        style.ContentMarginTop = 10f;
-        style.ContentMarginBottom = 10f;
-        style.ShadowColor = new Color(0f, 0f, 0f, 0.5f);
-        style.ShadowSize = 6;
-        box.AddThemeStyleboxOverride("panel", style);
+        var root = new MarginContainer { MouseFilter = MouseFilterEnum.Ignore };
 
-        var label = StyleBodyLabel(new Label
+        Texture2D? bgTexture = GD.Load<Texture2D>(HoverTipBackgroundTexturePath);
+
+        // Shadow first (drawn below Bg) - same nine-patch, but sampled from the texture atlas's own pre-baked
+        // shadow region (region_rect shifted -8,-8 from Bg's) and dimmed to 25% black, exactly like hover_tip.tscn's
+        // "Shadow" node. The blur is baked into the source art at that offset, not a runtime drop-shadow effect.
+        root.AddChild(BuildHoverTipNinePatch(bgTexture, new Rect2(-8, -8, 339, 107), new Color(0f, 0f, 0f, 0.25098f)));
+        root.AddChild(BuildHoverTipNinePatch(bgTexture, new Rect2(0, 0, 339, 107), Colors.White));
+
+        var textContainer = new MarginContainer { MouseFilter = MouseFilterEnum.Ignore };
+        textContainer.AddThemeConstantOverride("margin_left", 22);
+        textContainer.AddThemeConstantOverride("margin_top", 16);
+        textContainer.AddThemeConstantOverride("margin_right", 45);
+        textContainer.AddThemeConstantOverride("margin_bottom", 28);
+        root.AddChild(textContainer);
+
+        var vbox = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+        vbox.AddThemeConstantOverride("separation", 0);
+        textContainer.AddChild(vbox);
+
+        var titleLabel = new Label { Text = title, MouseFilter = MouseFilterEnum.Ignore };
+        titleLabel.AddThemeColorOverride("font_color", StsColors.gold);
+        titleLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.25098f));
+        titleLabel.AddThemeConstantOverride("shadow_offset_x", 3);
+        titleLabel.AddThemeConstantOverride("shadow_offset_y", 2);
+        titleLabel.AddThemeFontSizeOverride("font_size", 22);
+        Font? titleFont = ResolveFont(PillButtonBoldFontPath, FontType.Bold);
+        if (titleFont != null)
         {
-            Text = text,
+            titleLabel.AddThemeFontOverride("font", titleFont);
+        }
+        vbox.AddChild(titleLabel);
+
+        var descriptionLabel = new RichTextLabel
+        {
+            Text = description,
+            BbcodeEnabled = true,
+            FitContent = true,
+            ScrollActive = false,
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
-            CustomMinimumSize = new Vector2(360f, 0f),
+            CustomMinimumSize = new Vector2(300f, 0f),
             MouseFilter = MouseFilterEnum.Ignore,
-        });
-        label.AddThemeFontSizeOverride("font_size", 22);
-        box.AddChild(label);
-        return box;
+        };
+        descriptionLabel.AddThemeColorOverride("default_color", StsColors.cream);
+        descriptionLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.25098f));
+        descriptionLabel.AddThemeConstantOverride("shadow_offset_x", 3);
+        descriptionLabel.AddThemeConstantOverride("shadow_offset_y", 2);
+        descriptionLabel.AddThemeConstantOverride("line_separation", -2);
+        descriptionLabel.AddThemeFontSizeOverride("normal_font_size", 22);
+        descriptionLabel.AddThemeFontSizeOverride("bold_font_size", 22);
+        Font? regularFont = ResolveFont(PillButtonRegularFontPath, FontType.Regular);
+        if (regularFont != null)
+        {
+            descriptionLabel.AddThemeFontOverride("normal_font", regularFont);
+        }
+        Font? boldFont = ResolveFont(PillButtonBoldFontPath, FontType.Bold);
+        if (boldFont != null)
+        {
+            descriptionLabel.AddThemeFontOverride("bold_font", boldFont);
+        }
+        vbox.AddChild(descriptionLabel);
+
+        // Matches NHoverTipSet.Init's own control.ResetSize() call right after building a hover_tip.tscn instance -
+        // forces the MarginContainer (and its Bg/Shadow/TextContainer children, which fill whatever rect the
+        // container resolves to) to size themselves to the title+description content immediately, rather than
+        // whatever stale/default size a fresh Control starts with.
+        root.ResetSize();
+        return root;
+    }
+
+    /// <summary>One Bg/Shadow layer of BuildCustomTooltipBox's box - see hover_tip.tscn's own Bg/Shadow nodes
+    /// (reference/ui/hover_tip.tscn): same nine-patch texture and patch margins for both, only the sampled
+    /// region/tint differs between the crisp box art and its pre-baked shadow variant.</summary>
+    private static NinePatchRect BuildHoverTipNinePatch(Texture2D? texture, Rect2 regionRect, Color modulate)
+    {
+        return new NinePatchRect
+        {
+            Texture = texture,
+            RegionRect = regionRect,
+            Modulate = modulate,
+            PatchMarginLeft = 55,
+            PatchMarginTop = 43,
+            PatchMarginRight = 91,
+            PatchMarginBottom = 32,
+            AxisStretchHorizontal = NinePatchRect.AxisStretchMode.Tile,
+            AxisStretchVertical = NinePatchRect.AxisStretchMode.Tile,
+            MouseFilter = MouseFilterEnum.Ignore,
+        };
     }
 
     /// <summary>Shows/hides a BuildCustomTooltipBox on hoverSource's own MouseEntered/Exited, added to
     /// overlayParent (a top-level Control, clear of any ScrollContainer) and positioned via the given callback -
     /// re-evaluated on every show rather than computed once, since the row's own on-screen position can change
     /// (e.g. the page scrolling) between one hover and the next.</summary>
-    private static void WireCustomTooltip(Control hoverSource, string text, Control overlayParent, Func<Vector2> position)
+    private static void WireCustomTooltip(Control hoverSource, string title, string description, Control overlayParent, Func<Vector2> position)
     {
         Control? active = null;
 
@@ -1527,7 +1611,7 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
             {
                 return;
             }
-            active = BuildCustomTooltipBox(text);
+            active = BuildCustomTooltipBox(title, description);
             overlayParent.AddChild(active);
             active.SetGlobalPosition(position());
         }
