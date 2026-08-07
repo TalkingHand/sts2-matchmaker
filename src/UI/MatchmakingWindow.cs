@@ -103,7 +103,7 @@ public class MatchmakingWindow : Sts2ModalPanel
         _rehostWaitButton = BuildSettingsActionButton("대기", new Vector2(320f, 64f));
         WireHoverBrightness(_rehostWaitButton);
         _rehostWaitButton.Pressed += OnRehostWaitPressed;
-        page.AddChild(BuildSettingsRow("재모집", _rehostWaitButton));
+        page.AddChild(BuildSettingsRow("이어하기", _rehostWaitButton));
         page.AddChild(BuildSettingsDivider());
 
         _confirmButton = AddConfirmButton("매칭 시작", OnConfirmPressed);
@@ -267,7 +267,7 @@ public class MatchmakingWindow : Sts2ModalPanel
         }
         SaveCurrentSettings();
         _pendingCts = new CancellationTokenSource();
-        SetBusyStatus("팀원이 재모집을 열 때까지 대기 중");
+        SetBusyStatus("팀원이 이어하기를 열 때까지 대기 중");
         ApplyPendingUiState();
         _ = RehostWaitAsync(_pendingCts.Token);
     }
@@ -279,7 +279,7 @@ public class MatchmakingWindow : Sts2ModalPanel
             AutoMatchResult result = await AutoMatchService.WaitForRehostAsync(cancelToken);
             if (IsInstanceValid(this) && result.Outcome == AutoMatchOutcome.JoinExisting)
             {
-                SetBusyStatus("재모집 로비 발견, 접속 중");
+                SetBusyStatus("이어하기 로비 발견, 접속 중");
                 _ = JoinAsync(result.LobbyId!.Value);
             }
         }
@@ -292,7 +292,7 @@ public class MatchmakingWindow : Sts2ModalPanel
             Log.Error($"[sts2_matchmaker] Unhandled exception during rehost wait: {ex}");
             if (IsInstanceValid(this))
             {
-                SetFinalStatus($"재모집 대기 중 예외: {ex.Message}");
+                SetFinalStatus($"이어하기 대기 중 예외: {ex.Message}");
             }
         }
         finally

@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <!-- Copy this file to Sts2Matchmaker.csproj.user (already gitignored) to override build settings for your
+         own machine without touching the tracked .csproj. Only ModDeployDir is shown here, but any property in
+         Sts2Matchmaker.csproj can be overridden the same way (e.g. GameDataDir, if the game isn't installed at
+         the default Steam path). -->
+    <ModDeployDir>C:\path\to\wherever\you\want\the\built\mod\deployed</ModDeployDir>
+  </PropertyGroup>
+</Project>

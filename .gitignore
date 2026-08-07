@@ -1,6 +1,7 @@
 # 빌드 산출물
 bin/
 obj/
+.deploy/
 
 # Visual Studio / Rider / VS Code
 .vs/

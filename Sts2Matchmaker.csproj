@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Personal machine settings (deploy path, non-default game install location, etc) go in
+       Sts2Matchmaker.csproj.user instead of here - the .NET SDK already auto-imports that file if present (same
+       convention Visual Studio uses), and *.user is already gitignored, so anything set there never reaches the
+       public repo. See Sts2Matchmaker.csproj.user.example for the expected shape. -->
+
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -46,11 +51,11 @@
   <PropertyGroup>
     <!-- Game install root (one level up from GameDataDir) - where the "mods" folder next to SlayTheSpire2.exe lives. -->
     <GameRootDir Condition="'$(GameRootDir)' == ''">$([System.IO.Path]::GetFullPath('$(GameDataDir)\..'))</GameRootDir>
-    <!-- Deploys straight into the Google Drive-synced folder instead of the real mods folder directly, so every
-         build automatically propagates to anyone else syncing that same Drive folder. The game's own
-         "mods\sts2_matchmaker" is a directory symlink pointing here (see setup below), so local testing on this
-         machine still works unchanged - override with -p:ModDeployDir=... to deploy elsewhere. -->
-    <ModDeployDir Condition="'$(ModDeployDir)' == ''">G:\내 드라이브\sts2matchmaker</ModDeployDir>
+    <!-- Defaults to a folder inside the repo itself, so a plain `dotnet build` never fails on a fresh checkout
+         with no personal setup. Real dev workflows (e.g. deploying straight into a Drive-synced folder that the
+         game's own "mods\sts2_matchmaker" symlinks to, so every build auto-propagates without a manual copy step)
+         belong in Sts2Matchmaker.csproj.user (see the Import above) or -p:ModDeployDir=... instead. -->
+    <ModDeployDir Condition="'$(ModDeployDir)' == ''">$(MSBuildProjectDirectory)\.deploy\sts2_matchmaker</ModDeployDir>
   </PropertyGroup>
 
   <ItemGroup>
