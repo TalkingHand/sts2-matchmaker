@@ -1,0 +1,78 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Personal machine settings (deploy path, non-default game install location, etc) go in
+       Sts2Matchmaker.csproj.user instead of here - the .NET SDK already auto-imports that file if present (same
+       convention Visual Studio uses), and *.user is already gitignored, so anything set there never reaches the
+       public repo. See Sts2Matchmaker.csproj.user.example for the expected shape. -->
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <!-- Must exactly match mod_manifest.json's "id" - the mod loader loads "<mods_dir>/<id>/<id>.dll" verbatim. -->
+    <AssemblyName>sts2_matchmaker</AssemblyName>
+    <RootNamespace>Sts2Matchmaker</RootNamespace>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <!-- Slay the Spire 2's managed assemblies folder. Override with -p:GameDataDir=... if installed elsewhere. -->
+    <GameDataDir Condition="'$(GameDataDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2\data_sts2_windows_x86_64</GameDataDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- tools/ holds its own standalone csproj (LobbyDiagnostic); keep its sources/obj out of our default glob. -->
+    <Compile Remove="tools\**\*.cs" />
+    <None Remove="tools\**" />
+    <!-- reference/ is decompiled game source (ilspycmd/GDRE output) kept for lookup only - it uses compiler-internal
+         types (e.g. ILSpy's synthesized <>z__ReadOnlySingleElementList<>) that don't exist outside the game's own
+         assembly, so including it in our compile fails outright. Never meant to build, just to read. -->
+    <Compile Remove="reference\**\*.cs" />
+    <None Remove="reference\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- All of these are already loaded by the game process at runtime, so never copy them into our own output. -->
+    <Reference Include="GodotSharp">
+      <HintPath>$(GameDataDir)\GodotSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="sts2">
+      <HintPath>$(GameDataDir)\sts2.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Steamworks.NET">
+      <HintPath>$(GameDataDir)\Steamworks.NET.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GameDataDir)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!-- Game install root (one level up from GameDataDir) - where the "mods" folder next to SlayTheSpire2.exe lives. -->
+    <GameRootDir Condition="'$(GameRootDir)' == ''">$([System.IO.Path]::GetFullPath('$(GameDataDir)\..'))</GameRootDir>
+    <!-- Defaults to a folder inside the repo itself, so a plain `dotnet build` never fails on a fresh checkout
+         with no personal setup. Real dev workflows (e.g. deploying straight into a Drive-synced folder that the
+         game's own "mods\sts2_matchmaker" symlinks to, so every build auto-propagates without a manual copy step)
+         belong in Sts2Matchmaker.csproj.user (see the Import above) or -p:ModDeployDir=... instead. -->
+    <ModDeployDir Condition="'$(ModDeployDir)' == ''">$(MSBuildProjectDirectory)\.deploy\sts2_matchmaker</ModDeployDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Runtime assets (icons, etc) loaded via Image.LoadFromFile from the mod's own directory at runtime - not
+         compiled resources, just plain files that ride along next to the DLL. Put new PNGs here. -->
+    <ModAsset Include="assets\**\*.*" />
+  </ItemGroup>
+
+  <!-- Copies the built dll/pdb + manifest + assets into ModDeployDir after every build, so relaunching the game (or
+       just restarting it) always picks up the latest code without a manual copy step. -->
+  <Target Name="DeployToMods" AfterTargets="Build">
+    <MakeDir Directories="$(ModDeployDir)" Condition="!Exists('$(ModDeployDir)')" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(ModDeployDir)" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).pdb" DestinationFolder="$(ModDeployDir)" Condition="Exists('$(OutputPath)$(AssemblyName).pdb')" />
+    <Copy SourceFiles="mod_manifest.json" DestinationFolder="$(ModDeployDir)" />
+    <Copy SourceFiles="@(ModAsset)" DestinationFolder="$(ModDeployDir)\assets\%(RecursiveDir)" Condition="'@(ModAsset)' != ''" />
+    <Message Importance="high" Text="Deployed sts2_matchmaker to $(ModDeployDir)" />
+  </Target>
+
+</Project>
