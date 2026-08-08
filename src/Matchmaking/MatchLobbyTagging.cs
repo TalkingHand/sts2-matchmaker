@@ -21,6 +21,7 @@ public static class MatchLobbyTagging
         // search time instead.
         SteamMatchmaking.SetLobbyData(lobbyId, MatchTags.OwnerKey, SteamUser.GetSteamID().m_SteamID.ToString());
         SteamMatchmaking.SetLobbyData(lobbyId, MatchTags.ModHashKey, MatchTags.ComputeGameplayModHash());
+        SteamMatchmaking.SetLobbyData(lobbyId, MatchTags.VersionKey, MatchTags.CurrentVersionTag());
         SteamMatchmaking.SetLobbyData(lobbyId, MatchTags.CommunityKey, MatchTags.NormalizeTag(communityName));
         SteamMatchmaking.SetLobbyData(lobbyId, MatchTags.LanguageKey, MatchTags.NormalizeTag(language));
         SteamMatchmaking.SetLobbyData(lobbyId, MatchTags.GameModeKey, gameMode.ToString());

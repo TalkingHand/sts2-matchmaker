@@ -89,6 +89,10 @@ public static class MatchSearchService
         SteamMatchmaking.AddRequestLobbyListStringFilter(MatchTags.ActiveKey, MatchTags.ActiveValue, ELobbyComparison.k_ELobbyComparisonEqual);
         SteamMatchmaking.AddRequestLobbyListStringFilter(MatchTags.KindKey, kind, ELobbyComparison.k_ELobbyComparisonEqual);
         SteamMatchmaking.AddRequestLobbyListStringFilter(MatchTags.GameModeKey, gameMode.ToString(), ELobbyComparison.k_ELobbyComparisonEqual);
+        // General and public-beta are different game builds - always filtered, never a togglable preference. See
+        // MatchTags.CurrentVersionTag.
+        string versionTag = MatchTags.CurrentVersionTag();
+        SteamMatchmaking.AddRequestLobbyListStringFilter(MatchTags.VersionKey, versionTag, ELobbyComparison.k_ELobbyComparisonEqual);
         SteamMatchmaking.AddRequestLobbyListDistanceFilter(region);
 
         if (requireModMatch)
@@ -126,7 +130,7 @@ public static class MatchSearchService
         SteamMatchmaking.AddRequestLobbyListFilterSlotsAvailable(1);
         SteamMatchmaking.AddRequestLobbyListResultCountFilter(50);
 
-        Log.Info($"[sts2_matchmaker] Searching lobbies (kind={kind}, mode={gameMode}, community='{normalizedCommunity}', language='{normalizedLanguage}', region={region}, maxPlayers={maxPlayers}, requireModMatch={requireModMatch}, ascension=exact:{ascension.Exact}/cap:{ascension.SustainableCap})");
+        Log.Info($"[sts2_matchmaker] Searching lobbies (kind={kind}, mode={gameMode}, community='{normalizedCommunity}', language='{normalizedLanguage}', version='{versionTag}', region={region}, maxPlayers={maxPlayers}, requireModMatch={requireModMatch}, ascension=exact:{ascension.Exact}/cap:{ascension.SustainableCap})");
         SteamAPICall_t call = SteamMatchmaking.RequestLobbyList();
         using var callResult = new SteamCallResult<LobbyMatchList_t>(call, cancelToken);
         LobbyMatchList_t result = await callResult.Task;

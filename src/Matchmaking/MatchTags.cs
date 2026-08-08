@@ -4,6 +4,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using MegaCrit.Sts2.Core.Modding;
+using MegaCrit.Sts2.Core.Multiplayer;
 using MegaCrit.Sts2.Core.Saves;
 
 namespace Sts2Matchmaker.Matchmaking;
@@ -20,6 +21,7 @@ public static class MatchTags
     public const string GameModeKey = "sts2mm_gamemode";
     public const string MaxPlayersKey = "sts2mm_maxplayers";
     public const string LanguageKey = "sts2mm_language";
+    public const string VersionKey = "sts2mm_version";
 
     /// <summary>
     /// The ascension level this lobby will actually play at. Deliberately NOT StartRunLobby.Ascension (the host can
@@ -86,6 +88,21 @@ public static class MatchTags
     public static string NormalizeTag(string? raw)
     {
         return (raw ?? string.Empty).Trim().ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// This client's actual game version string - PeerVersionInfo.version, the same field the game's own join
+    /// handshake compares (see PeerVersionInfo.gameplayAffectingMods, used the same way for ModHashKey below).
+    /// Deliberately keyed on the version string rather than PeerVersionInfo.branch (general vs. public-beta):
+    /// MegaCrit periodically promotes a public-beta build to the general/production branch, at which point both
+    /// branches run identical content and can play together even though their branch enum still differs - version
+    /// equality is what actually determines compatibility, not which branch you're currently opted into. Like
+    /// ModHashKey, this is never a togglable preference: written unconditionally by MatchLobbyTagging.ApplyTags and
+    /// filtered unconditionally by MatchSearchService.SearchAsync.
+    /// </summary>
+    public static string CurrentVersionTag()
+    {
+        return NormalizeTag(PeerVersionInfo.LocalDefault().version);
     }
 
     /// <summary>
