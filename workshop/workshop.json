@@ -1,8 +1,8 @@
 {
   "title": "Match Maker",
   "description": "A mod that improves multiplayer convenience and adds automatic matchmaking.\nMatch multiplayer lobbies based on community name / language / ascension / player count / installed mods, or use quick rehosting and kick/ban features.\n\nDoesn't affect gameplay, so you can freely play with people who don't have it installed.\n\nhttps://github.com/TalkingHand/sts2-matchmaker",
-  "visibility": "private",
-  "changeNote": "Added a Copy Link button (in-lobby matching settings) to copy a direct-join invite link, fixed a bug where the solo challenge-history screen showed a Ban button on yourself, and added the matching UI to Daily Challenge lobbies.",
+  "visibility": "public",
+  "changeNote": "Fixed a bug where leaving the community field empty would still match you into community-tagged lobbies. Added a Copy Link button to the rehost screens (Standard/Daily/Custom) in the same spot the invite button uses on fresh lobbies. Added live autocomplete (recent names) to the community field, plus input-focus fixes so typing no longer leaks into an active match search.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
