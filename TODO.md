@@ -63,3 +63,22 @@
 
 디컴파일은 `ilspycmd`(dotnet tool, 이미 설치돼 있음)로 `data_sts2_windows_x86_64\sts2.dll` 전체를
 프로젝트 모드로 뽑아서 grep하는 식으로 진행함 (`ilspycmd -p -o <출력폴더> sts2.dll`).
+
+## 위시리스트 (아직 조사 전, 아이디어만 기록)
+
+커뮤니티명 자동완성/최근 목록은 구현 완료 (`Sts2NativeDropdown` 활용, `MatchConditionsPanel`). 아래
+둘은 "언젠가 해볼만한 것" 수준으로만 남겨둠 - 설계/구현 전이라 세부 방향은 착수 시 다시 검토할 것.
+
+### 밴 목록 공유/백업
+
+`BanListStore`(`src/Matchmaking/BanListStore.cs`)가 로컬 config 파일 하나뿐이라 컴퓨터를 바꾸면
+날아가고, 커뮤니티 운영진끼리 밴 목록을 미리 공유할 방법도 없음 (지금은 같은 로비에 들어가야
+`BanTagSync`로 그 로비 안에서만 서로 합쳐짐). export/import 버튼 정도만 `BanListPanel`에 붙이면
+될 것 같은데, 파일 포맷(JSON? 기존 ConfigFile 그대로?)과 병합 시 충돌 처리 방식은 미정.
+
+### 로비 목록 브라우징
+
+지금 매칭은 `AutoMatchService`가 검색해서 첫 매칭 후보에 자동 참가하거나, 없으면 바로 자기가
+호스트로 전환하는 구조 (`MatchSearchService.SearchWithProgressiveRegionAsync` 결과를 사람이 직접
+보고 고르는 경로가 없음). 인원수/승천 레벨 등을 보고 직접 고르고 싶다는 요구가 생기면 검토 - 셋 중
+가장 큰 작업이라 후순위. UI적으로는 `MatchmakingWindow`에 리스트 뷰를 새로 얹어야 함.

@@ -147,6 +147,8 @@ public class MatchConditionsWindow : Sts2ModalPanel
 
     private void OnTogglePressed()
     {
+        // See MatchmakingWindow.OnConfirmPressed's own comment - same reasoning, same fix.
+        GetViewport()?.GuiReleaseFocus();
         string? rawLobbyId = _lobby.NetService.GetRawLobbyIdentifier();
         if (rawLobbyId == null || !ulong.TryParse(rawLobbyId, out ulong lobbyIdValue))
         {
@@ -244,27 +246,18 @@ public class MatchConditionsWindow : Sts2ModalPanel
         base.OnCloseRequested();
     }
 
-    /// <summary>Copies a steam://joinlobby/{appId}/{lobbyId}/{inviterId} URI to the clipboard - Valve's own
-    /// documented format for a direct-join lobby link (clicking it launches Steam, installs/launches the game if
-    /// needed, and joins that lobby directly). The trailing ID is "whoever you got this link from", which is us
-    /// since we're the host. Static + explicit lobby/label params (not instance state) so it reads standalone at
-    /// the call site above, same reasoning as SaveCurrentSettings/OnTogglePressed already use _lobby directly for.
-    /// label is BuildSettingsActionButton's own plain Label out-param, not BuildTextActionButton's - swapped
-    /// directly rather than through UpdateTextActionButtonText, which assumes that other button's own fixed-to-text
-    /// auto-sizing behavior (this button's size stays fixed at 320x64, matching "대기"'s own, regardless of text).</summary>
+    /// <summary>Static + explicit lobby/label params (not instance state) so it reads standalone at the call site
+    /// above, same reasoning as SaveCurrentSettings/OnTogglePressed already use _lobby directly for. label is
+    /// BuildSettingsActionButton's own plain Label out-param, not BuildTextActionButton's - swapped directly rather
+    /// than through UpdateTextActionButtonText, which assumes that other button's own fixed-to-text auto-sizing
+    /// behavior (this button's size stays fixed at 320x64, matching "대기"'s own, regardless of text). The actual
+    /// link-building/clipboard-copy is shared with RehostLinkInjector via Sts2ModalPanel.CopyJoinLinkToClipboard.</summary>
     private static void OnCopyInviteLinkPressed(StartRunLobby lobby, Label label)
     {
-        string? rawLobbyId = lobby.NetService.GetRawLobbyIdentifier();
-        if (rawLobbyId == null || !ulong.TryParse(rawLobbyId, out ulong lobbyIdValue))
+        if (!CopyJoinLinkToClipboard(lobby.NetService))
         {
-            Log.Error("[sts2_matchmaker] Could not read raw lobby id when copying invite link");
             return;
         }
-        uint appId = SteamUtils.GetAppID().m_AppId;
-        ulong myId = SteamUser.GetSteamID().m_SteamID;
-        string link = $"steam://joinlobby/{appId}/{lobbyIdValue}/{myId}";
-        DisplayServer.ClipboardSet(link);
-        Log.Info($"[sts2_matchmaker] Copied invite link for lobby {lobbyIdValue} to clipboard");
 
         // Brief "복사됨!" confirmation in place of the button's own label, then back to "복사" - IsInstanceValid
         // guard covers this window closing before the timer fires.

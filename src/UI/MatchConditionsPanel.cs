@@ -44,6 +44,11 @@ public class MatchConditionsPanel : VBoxContainer
     };
 
     private LineEdit _communityInput = null!;
+    private List<string> _recentCommunities = new();
+    private Control? _communitySuggestionPopup;
+    private VBoxContainer? _communitySuggestionList;
+    private Control? _communitySuggestionDismisser;
+    private Timer? _communityRecordDebounceTimer;
     private NativeDropdownField<string> _languageField = null!;
     private NativeDropdownField<GameMode>? _gameModeField;
     private NativeDropdownField<int>? _maxPlayersField;
@@ -85,6 +90,35 @@ public class MatchConditionsPanel : VBoxContainer
         Sts2ModalPanel.StyleInput(_communityInput);
         AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("커뮤니티명"), _communityInput, tooltip: Loc.Get("내용이 일치하는 대상과 매칭됩니다."), overlayParent: _overlayParent));
         AddChild(Sts2ModalPanel.BuildSettingsDivider());
+
+        // Live suggestions as you type, not a separate always-visible row - community matching is exact-string
+        // equality (see MatchTags.NormalizeTag), so a single typo in this field silently creates an unreachable
+        // new "community" nobody else can find; surfacing matches from RecentCommunityStore.Load() (names actually
+        // used before, recorded by ApplyTo below, and by the debounce timer below for same-session typing that
+        // never reaches ApplyTo) right under the cursor is what actually prevents that, the way a browser address
+        // bar's own history autocomplete does. Focusing the empty field shows the most recent few; typing narrows
+        // to substring matches.
+        _recentCommunities = RecentCommunityStore.Load();
+
+        // Records whatever's typed ~1.5s after the user stops typing, WITHOUT waiting for the whole window to
+        // close (ApplyTo's own trigger) - typing a new name, clicking elsewhere, then coming back to retype its
+        // start should already offer it, not just after a full close/reopen. Timer-based rather than hooking
+        // FocusExited: a suggestion click below also moves focus away from _communityInput, and FocusExited fires
+        // on that click's PRESS (before the item's own Pressed/release sets the final text), so recording there
+        // would capture the stale pre-click text instead - a plain elapsed-time debounce sidesteps that race
+        // entirely instead of trying to out-order it. Setting .Text programmatically (the suggestion-pick path)
+        // does not itself raise TextChanged in Godot, so picking a suggestion never restarts this timer.
+        _communityRecordDebounceTimer = new Timer { WaitTime = 1.5, OneShot = true };
+        _communityRecordDebounceTimer.Timeout += OnCommunityRecordDebounceTimeout;
+        AddChild(_communityRecordDebounceTimer);
+
+        _communityInput.TextChanged += _ =>
+        {
+            UpdateCommunitySuggestions();
+            _communityRecordDebounceTimer.Stop();
+            _communityRecordDebounceTimer.Start();
+        };
+        _communityInput.FocusEntered += UpdateCommunitySuggestions;
 
         var languageOptions = new List<(string Label, string Value)> { (Loc.Get("언어 무관 (전체)"), string.Empty) };
         string currentLanguage = LocManager.Instance?.Language ?? string.Empty;
@@ -163,6 +197,143 @@ public class MatchConditionsPanel : VBoxContainer
         }
     }
 
+    /// <summary>Recomputes and shows/hides the suggestion popup for whatever's currently in _communityInput -
+    /// substring match (case/whitespace-insensitive, via MatchTags.NormalizeTag) against _recentCommunities,
+    /// excluding an entry that already equals the typed text exactly (nothing left to complete). Empty text shows
+    /// the most recent few instead of nothing, so focusing the field alone is a way to browse history.</summary>
+    private void UpdateCommunitySuggestions()
+    {
+        string normalizedTyped = MatchTags.NormalizeTag(_communityInput.Text);
+        List<string> matches = normalizedTyped.Length == 0
+            ? _recentCommunities.Take(5).ToList()
+            : _recentCommunities
+                .Where(name => MatchTags.NormalizeTag(name).Contains(normalizedTyped) && MatchTags.NormalizeTag(name) != normalizedTyped)
+                .Take(5)
+                .ToList();
+
+        if (matches.Count == 0)
+        {
+            HideCommunitySuggestions();
+            return;
+        }
+        ShowCommunitySuggestions(matches);
+    }
+
+    private void OnCommunityRecordDebounceTimeout()
+    {
+        string trimmed = _communityInput.Text.Trim();
+        if (trimmed.Length == 0)
+        {
+            return;
+        }
+        RecentCommunityStore.Record(trimmed);
+        _recentCommunities = RecentCommunityStore.Load();
+    }
+
+    private void ShowCommunitySuggestions(List<string> matches)
+    {
+        if (_communitySuggestionPopup == null)
+        {
+            BuildCommunitySuggestionPopup();
+        }
+
+        foreach (Node child in _communitySuggestionList!.GetChildren())
+        {
+            // Free(), not QueueFree() - rebuilt every keystroke, so a still-pending QueueFree from the PREVIOUS
+            // keystroke could still be sitting here as a live sibling when this loop's own AddChild calls run
+            // right after, the same stale-sibling hazard RecruitToggleInjector's own doc describes for its row.
+            child.Free();
+        }
+        foreach (string name in matches)
+        {
+            var itemButton = new Button
+            {
+                Text = name,
+                CustomMinimumSize = new Vector2(320f, 44f),
+                Alignment = HorizontalAlignment.Left,
+            };
+            Sts2ModalPanel.StyleAsSettingsButton(itemButton);
+            itemButton.Pressed += () =>
+            {
+                _communityInput.Text = name;
+                _communityInput.CaretColumn = name.Length;
+                HideCommunitySuggestions();
+                // Re-records immediately (not just relying on the debounce timer, which .Text's programmatic set
+                // above never restarts anyway - see the TextChanged doc) so a picked entry re-sorts to the front
+                // and stays available right away, not just after the next window close.
+                RecentCommunityStore.Record(name);
+                _recentCommunities = RecentCommunityStore.Load();
+            };
+            _communitySuggestionList.AddChild(itemButton);
+        }
+
+        // ResetSize before repositioning - PanelContainer's own Size is a cached last-computed value that does NOT
+        // automatically shrink just because this rebuild removed rows (e.g. narrowing from several matches down to
+        // one as the user keeps typing); without this, the panel keeps its previous, taller height and the extra
+        // leftover space below the last real row renders as a plain dark rectangle in its own background color.
+        _communitySuggestionPopup!.ResetSize();
+
+        // Repositioned on every show (not just once at construction) - the row's own on-screen position can move
+        // between opens the same way Sts2NativeDropdown's own RepositionDropdownContainer accounts for.
+        Vector2 fieldPos = _communityInput.GlobalPosition;
+        Vector2 fieldSize = _communityInput.Size;
+        _communitySuggestionPopup.GlobalPosition = new Vector2(fieldPos.X, fieldPos.Y + fieldSize.Y);
+        _communitySuggestionPopup.CustomMinimumSize = new Vector2(fieldSize.X, 0f);
+        _communitySuggestionPopup.Visible = true;
+        _communitySuggestionDismisser!.Visible = true;
+    }
+
+    private void HideCommunitySuggestions()
+    {
+        if (_communitySuggestionPopup != null)
+        {
+            _communitySuggestionPopup.Visible = false;
+        }
+        if (_communitySuggestionDismisser != null)
+        {
+            _communitySuggestionDismisser.Visible = false;
+        }
+    }
+
+    /// <summary>Built lazily on first actual need, into _overlayParent (see its own constructor-param doc - the
+    /// same "outside the ScrollContainer both host windows wrap their row content in" reasoning applies here too,
+    /// otherwise a popup opened from a community field scrolled near the bottom could get clipped). Two pieces,
+    /// same proven split Sts2NativeDropdown's own Dismisser/DropdownContainer pair uses: a full-rect invisible
+    /// Control added FIRST (so tree order alone gives the popup panel input priority over it wherever they
+    /// overlap, no z_index juggling needed) that closes the popup on any click outside it, and the actual popup
+    /// panel added second.</summary>
+    private void BuildCommunitySuggestionPopup()
+    {
+        Control overlayRoot = _overlayParent ?? this;
+
+        _communitySuggestionDismisser = new Control();
+        _communitySuggestionDismisser.SetAnchorsPreset(LayoutPreset.FullRect);
+        _communitySuggestionDismisser.MouseFilter = MouseFilterEnum.Stop;
+        _communitySuggestionDismisser.Visible = false;
+        _communitySuggestionDismisser.GuiInput += @event =>
+        {
+            if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: false })
+            {
+                HideCommunitySuggestions();
+                // Without this, a click that lands on this full-rect catcher (i.e. anywhere outside the popup
+                // itself while it's open) closes the suggestion list but leaves _communityInput focused - the
+                // same background-click-releases-focus behavior Sts2ModalPanel's own backdrop/contentRoot already
+                // have, just never reached because this catcher sits above them and consumes the click first.
+                GetViewport()?.GuiReleaseFocus();
+            }
+        };
+        overlayRoot.AddChild(_communitySuggestionDismisser);
+
+        var panel = new PanelContainer();
+        panel.AddThemeStyleboxOverride("panel", Sts2ModalPanel.BuildDropdownPanelStyleBox());
+        panel.SetAnchorsPreset(LayoutPreset.TopLeft);
+        panel.Visible = false;
+        _communitySuggestionList = new VBoxContainer();
+        panel.AddChild(_communitySuggestionList);
+        overlayRoot.AddChild(panel);
+        _communitySuggestionPopup = panel;
+    }
+
     /// <summary>
     /// Ascension picker, shown only to players who've actually unlocked some multiplayer ascension - the vanilla
     /// NAscensionPanel hides itself the same way (Visible = maxAscension > 0), and for the majority still sitting at
@@ -225,6 +396,7 @@ public class MatchConditionsPanel : VBoxContainer
     public void ApplyTo(MatchSettings settings)
     {
         settings.Community = Community;
+        RecentCommunityStore.Record(Community);
         settings.Language = Language;
         settings.RequireModMatch = RequireModMatch;
         settings.Ascension = SelectedAscension;

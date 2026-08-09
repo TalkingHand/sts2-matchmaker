@@ -179,6 +179,10 @@ public class MatchmakingWindow : Sts2ModalPanel
         {
             return;
         }
+        // Otherwise a still-focused text field (e.g. 커뮤니티명, left focused from typing into it and clicking
+        // this button directly - some buttons here don't grab focus on click themselves) keeps eating keyboard
+        // input for the rest of the search/host flow, typing into a field nobody's looking at anymore.
+        GetViewport()?.GuiReleaseFocus();
         SaveCurrentSettings();
         _pendingCts = new CancellationTokenSource();
         // Always "매칭 시도 중", regardless of "호스트 허용": this popup always searches first and its outcome

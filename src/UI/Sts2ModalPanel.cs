@@ -6,11 +6,13 @@ using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Localization.Fonts;
 using MegaCrit.Sts2.Core.Logging;
+using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Screens.Settings;
 using MegaCrit.Sts2.Core.Nodes.Screens.ScreenContext;
 using Sts2Matchmaker.Localization;
+using Steamworks;
 
 namespace Sts2Matchmaker.UI;
 
@@ -783,6 +785,30 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
     /// curve genuinely doesn't fit nine-slicing at this UI scale - see tools/UiPreview for how this was diagnosed
     /// offline (renders the exact composite without needing the game running).
     /// </summary>
+    /// <summary>Copies a steam://joinlobby/{appId}/{lobbyId}/{inviterId} URI to the clipboard - Valve's own
+    /// documented format for a direct-join lobby link (clicking it launches Steam, installs/launches the game if
+    /// needed, and joins that lobby directly). The trailing ID is "whoever you got this link from", i.e. whichever
+    /// local player pressed the button - not necessarily the host, since any lobby member can share this the same
+    /// way they could use the native Steam invite dialog. Shared by MatchConditionsWindow's in-lobby "링크 복사" row
+    /// and RehostLinkInjector's rehost-screen button rather than duplicated, since both only ever need
+    /// INetGameService (not the StartRunLobby/LoadRunLobby wrapper around it). Returns false without copying
+    /// anything if the raw lobby id isn't readable yet, so callers can skip their own success feedback.</summary>
+    internal static bool CopyJoinLinkToClipboard(INetGameService netService)
+    {
+        string? rawLobbyId = netService.GetRawLobbyIdentifier();
+        if (rawLobbyId == null || !ulong.TryParse(rawLobbyId, out ulong lobbyIdValue))
+        {
+            Log.Error("[sts2_matchmaker] Could not read raw lobby id when copying invite link");
+            return false;
+        }
+        uint appId = SteamUtils.GetAppID().m_AppId;
+        ulong myId = SteamUser.GetSteamID().m_SteamID;
+        string link = $"steam://joinlobby/{appId}/{lobbyIdValue}/{myId}";
+        DisplayServer.ClipboardSet(link);
+        Log.Info($"[sts2_matchmaker] Copied invite link for lobby {lobbyIdValue} to clipboard");
+        return true;
+    }
+
     internal static Button BuildPillButton(Vector2 size, out RichTextLabel label, float hue = 1f, float saturation = 1f, float value = 0.9f, Color? outlineColor = null)
     {
         var button = new Button { CustomMinimumSize = size, Flat = true };
@@ -1288,6 +1314,12 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
     ///    user-driven clicks) - so an ItemSelected hook alone would miss those. A lightweight polling Timer catches
     ///    every case uniformly instead of auditing/patching every call site that selects an item.
     /// </summary>
+    /// <summary>Same dark-navy background StyleAsSettingsDropdown's own native popup uses (SettingsDropdownPanel) -
+    /// exposed as a plain StyleBoxFlat (not tied to a PopupMenu) for MatchConditionsPanel's community-name
+    /// suggestion popup, which isn't a Sts2ModalPanel subclass itself and so can't reach the protected color field
+    /// directly.</summary>
+    internal static StyleBoxFlat BuildDropdownPanelStyleBox() => new() { BgColor = SettingsDropdownPanel };
+
     internal static Control StyleAsSettingsDropdown(OptionButton optionButton)
     {
         var normal = new StyleBoxFlat { BgColor = SettingsDropdownUnfocused };
