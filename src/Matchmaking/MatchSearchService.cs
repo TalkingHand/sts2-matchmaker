@@ -68,7 +68,9 @@ public readonly struct AscensionSearchFilter
 /// <summary>
 /// Searches Steam's own lobby list (SteamMatchmaking.RequestLobbyList) for lobbies tagged as matchmaking-active,
 /// optionally filtered to an exact community name, language, player-count preference, game mode, and/or an exact
-/// gameplay-mod-set match. Region uses Steam's own geolocation-based distance filter rather than a custom tag.
+/// gameplay-mod-set match. An empty community filter means "public search" and excludes any lobby that
+/// advertises a community name of its own - it does not mean "any community". Region uses Steam's own
+/// geolocation-based distance filter rather than a custom tag.
 /// Defaults to fresh lobbies only - rehost lobbies only accept players who were already in that save, so they're
 /// excluded unless explicitly requested.
 /// </summary>
@@ -168,6 +170,14 @@ public static class MatchSearchService
             }
             var ownerId = new CSteamID(ownerSteamId);
             string community = SteamMatchmaking.GetLobbyData(lobbyId, MatchTags.CommunityKey);
+            if (string.IsNullOrEmpty(normalizedCommunity) && !string.IsNullOrEmpty(community))
+            {
+                // No community filter was requested (public search) - Steam's own lobby-list filter is only
+                // ever additive (see the AddRequestLobbyListStringFilter call above, skipped entirely when
+                // normalizedCommunity is empty), so without this check a public search would surface every
+                // community's private lobbies too. Public players should only ever see public (untagged) lobbies.
+                continue;
+            }
             string lobbyKind = SteamMatchmaking.GetLobbyData(lobbyId, MatchTags.KindKey);
             int memberCount = SteamMatchmaking.GetNumLobbyMembers(lobbyId);
             int maxMembers = SteamMatchmaking.GetLobbyMemberLimit(lobbyId);
