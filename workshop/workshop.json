@@ -2,7 +2,7 @@
   "title": "Match Maker",
   "description": "A mod that improves multiplayer convenience and adds automatic matchmaking.\nMatch multiplayer lobbies based on community name / language / ascension / player count / installed mods, or use quick rehosting and kick/ban features.\n\nDoesn't affect gameplay, so you can freely play with people who don't have it installed.\n\nhttps://github.com/TalkingHand/sts2-matchmaker",
   "visibility": "public",
-  "changeNote": "Added a guest-matching fallback for the community search filter: when no lobby hosted through this mod is found, it now also tries vanilla (non-modded) lobbies posted to that community's own recruitment board, joining automatically when one matches your conditions. Also added a confirmation sound when matching successfully joins a lobby, and fixed several timing bugs around cancelling an in-progress match search.",
+  "changeNote": "Fixed the guest-matching fallback (added in v0.3.0): a recruitment post that doesn't mention a player count is now treated as a full 4-player room instead of matching any player-count setting, so a search for a specific smaller group no longer gets matched into an unlabeled 4-player post.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
