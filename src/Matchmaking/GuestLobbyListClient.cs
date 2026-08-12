@@ -23,7 +23,12 @@ namespace Sts2Matchmaker.Matchmaking;
 public static class GuestLobbyListClient
 {
     private const string Endpoint = "http://161.33.165.92:5000/lobbys.json";
-    private static readonly TimeSpan MinFetchInterval = TimeSpan.FromSeconds(5);
+    // The crawler itself only rewrites lobbys.json once every 5s, so polling faster than that never gets newer
+    // data - it just changes how much of that 5s window we might catch it in. 3.5s (comfortably above the
+    // server's hard 3s floor) trims worst-case staleness from "up to 5s late" to "up to 3.5s late" without
+    // meaningfully raising request volume. Internal (not private) so AutoMatchService's guest-poll loop can pace
+    // itself against the exact same interval instead of duplicating the number.
+    internal static readonly TimeSpan MinFetchInterval = TimeSpan.FromSeconds(3.5);
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
     private static readonly SemaphoreSlim FetchLock = new(1, 1);
 

@@ -36,29 +36,6 @@ namespace Sts2Matchmaker.UI;
 /// </summary>
 public static class RecruitToggleInjector
 {
-    // A plain Godot AudioStream resource (confirmed by grepping SlayTheSpire2.pck directly for its res:// path),
-    // not an FMOD event like every other sound this mod plays (see Sts2ModalPanel.PlayClickSfx) - lives in the
-    // game's own res://debug_audio/ folder alongside heavy_attack.mp3/hiss.mp3/etc, so AudioStreamPlayer is the
-    // right way to play it, not SfxCmd.Play (which expects "event:/..." FMOD paths and wouldn't resolve this).
-    private const string PlayerLimitReachedSfxPath = "res://debug_audio/hey.mp3";
-
-    /// <summary>One-shot playback for PlayerLimitReachedSfxPath - builds a throwaway AudioStreamPlayer under
-    /// liveParent (must already be in the live tree) and frees it once playback finishes, so nothing lingers after
-    /// the sound is done.</summary>
-    private static void PlayPlayerLimitReachedSfx(Node liveParent)
-    {
-        AudioStream? stream = GD.Load<AudioStream>(PlayerLimitReachedSfxPath);
-        if (stream == null)
-        {
-            Log.Error($"[sts2_matchmaker] Could not load {PlayerLimitReachedSfxPath}");
-            return;
-        }
-        var player = new AudioStreamPlayer { Stream = stream };
-        liveParent.AddChild(player);
-        player.Finished += player.QueueFree;
-        player.Play();
-    }
-
     public static void Inject(Node screenNode, StartRunLobby lobby)
     {
         try
@@ -190,7 +167,7 @@ public static class RecruitToggleInjector
                 }
                 MatchLobbyTagging.RemoveFromSearch(new CSteamID(idValue));
                 Log.Info($"[sts2_matchmaker] Lobby {idValue} reached its matching target ({lobby.Players.Count}/{targetMaxPlayers}) - auto-closed from matching search");
-                PlayPlayerLimitReachedSfx(wrapper);
+                MatchSfx.PlayMatchFoundSfx(wrapper);
 
                 // If the matching-conditions screen happens to be open right now, it was blocking its own close
                 // while the search was active (see MatchConditionsWindow.OnCloseRequested) - now that there's
