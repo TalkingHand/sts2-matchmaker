@@ -80,19 +80,41 @@ public static class GuestMatchService
                 GuestDeadCandidateTracker.MarkDead(lobby.No);
                 continue;
             }
-            int memberCount = SteamMatchmaking.GetNumLobbyMembers(lobbyId);
-            int memberLimit = SteamMatchmaking.GetLobbyMemberLimit(lobbyId);
-            if (memberLimit > 0 && memberCount >= memberLimit)
+            // Wrapped like the join attempt below: none of these are expected to throw (Steamworks getters and
+            // the local ban stores), but if one ever does, treat it as "can't verify this candidate, skip it"
+            // rather than letting it fault the whole guest loop - GuestPollLoopAsync's caller (AutoMatchService)
+            // relies on this loop only ever completing via a real success or a genuine cancellation, so a lobby
+            // this mod otherwise legitimately found (e.g. via its own Steam-tag search) never gets discarded over
+            // an unrelated exception in here.
+            bool candidateVerified = true;
+            try
             {
-                Log.Info($"[sts2_matchmaker] Guest candidate {lobbyIdValue} (no={lobby.No}) is full ({memberCount}/{memberLimit}), skipping");
-                continue;
+                int memberCount = SteamMatchmaking.GetNumLobbyMembers(lobbyId);
+                int memberLimit = SteamMatchmaking.GetLobbyMemberLimit(lobbyId);
+                if (memberLimit > 0 && memberCount >= memberLimit)
+                {
+                    Log.Info($"[sts2_matchmaker] Guest candidate {lobbyIdValue} (no={lobby.No}) is full ({memberCount}/{memberLimit}), skipping");
+                    candidateVerified = false;
+                }
+                else if (BanTagSync.IsLocalPlayerBannedFromLobby(lobbyId))
+                {
+                    candidateVerified = false;
+                }
+                else
+                {
+                    ulong ownerId = SteamMatchmaking.GetLobbyOwner(lobbyId).m_SteamID;
+                    if (BanListStore.IsBanned(ownerId))
+                    {
+                        candidateVerified = false;
+                    }
+                }
             }
-            if (BanTagSync.IsLocalPlayerBannedFromLobby(lobbyId))
+            catch (Exception ex)
             {
-                continue;
+                Log.Info($"[sts2_matchmaker] Guest candidate {lobbyIdValue} (no={lobby.No}) metadata check threw, skipping: {ex.Message}");
+                candidateVerified = false;
             }
-            ulong ownerId = SteamMatchmaking.GetLobbyOwner(lobbyId).m_SteamID;
-            if (BanListStore.IsBanned(ownerId))
+            if (!candidateVerified)
             {
                 continue;
             }

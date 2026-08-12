@@ -196,10 +196,14 @@ public class MatchmakingWindow : Sts2ModalPanel
 
     private void OnCancelPressed()
     {
+        // Deliberately does NOT clear _pendingCts or re-enable 매칭 시작 here - that only happens once the
+        // background AutoMatchAsync/RehostWaitAsync task below has actually finished unwinding (their own
+        // `finally` blocks do it). Clearing it eagerly let a rapid cancel-then-restart start a brand new
+        // AutoMatchService call while the cancelled one was still mid-cleanup - both touching the same `_stack`
+        // at once, exactly the kind of overlap AutoMatchService's own cancel-then-await handshake is meant to
+        // prevent, just one level up. The button staying disabled for that last moment is the correct trade-off.
         _pendingCts?.Cancel();
-        _pendingCts = null;
         SetFinalStatus(Loc.Get("매칭 취소됨"));
-        ApplyPendingUiState();
     }
 
     private async Task AutoMatchAsync(CancellationToken cancelToken)
@@ -249,10 +253,14 @@ public class MatchmakingWindow : Sts2ModalPanel
                 _ = JoinAsync(result.LobbyId!.Value);
                 break;
             case AutoMatchOutcome.Joined:
+                // GuestMatchService already completed the join internally (silent DC-candidate retry loop) -
+                // nothing left to do but play the same "매칭 성사" cue the host side gets when its own search
+                // auto-closes, then close our popup, since the game has already navigated to whatever screen the
+                // join landed on.
+                MatchSfx.PlayMatchFoundSfx(_stack);
+                NModalContainer.Instance?.Clear();
+                break;
             case AutoMatchOutcome.BecameHost:
-                // Joined: GuestMatchService already completed the join internally (silent DC-candidate retry
-                // loop) - nothing left to do but close our popup, same as a successful host, since the game has
-                // already navigated to whatever screen the join landed on.
                 NModalContainer.Instance?.Clear();
                 break;
             case AutoMatchOutcome.Error:
@@ -291,7 +299,9 @@ public class MatchmakingWindow : Sts2ModalPanel
                 }
                 else if (result.Outcome == AutoMatchOutcome.Joined)
                 {
-                    // Already connected via GuestMatchService's DC-crawled rehost search - just close our popup.
+                    // Already connected via GuestMatchService's DC-crawled rehost search - same audible
+                    // confirmation as the fresh-match Joined case, then close our popup.
+                    MatchSfx.PlayMatchFoundSfx(_stack);
                     NModalContainer.Instance?.Clear();
                 }
             }
@@ -327,6 +337,7 @@ public class MatchmakingWindow : Sts2ModalPanel
         try
         {
             await MatchJoinService.JoinLobbyAsync(_stack, lobbyId);
+            MatchSfx.PlayMatchFoundSfx(_stack);
         }
         catch (Exception ex)
         {
