@@ -53,6 +53,15 @@ public static class AutoMatchService
                 return AutoMatchResult.Join(found[0].LobbyId);
             }
 
+            // Nothing hosted through this mod - fall back to vanilla lobbies crawled from the DC recruit board.
+            // Tried regardless of CanHost, but only up to this point in the loop: once hosting is decided below,
+            // this function returns and never runs again for this search.
+            CSteamID? guestJoined = await GuestMatchService.TryJoinFromListAsync(stack, settings, cancelToken);
+            if (guestJoined.HasValue)
+            {
+                return AutoMatchResult.Joined(guestJoined.Value);
+            }
+
             if (!settings.CanHost)
             {
                 Log.Info("[sts2_matchmaker] AutoMatch found nothing and canHost=false, waiting to retry");
@@ -87,7 +96,7 @@ public static class AutoMatchService
     /// the way a community-name filter could. Game mode isn't filtered on by a preference either, since the save
     /// itself fixes the mode - this just tries all three so it doesn't need to know it in advance.
     /// </summary>
-    public static async Task<AutoMatchResult> WaitForRehostAsync(CancellationToken cancelToken = default)
+    public static async Task<AutoMatchResult> WaitForRehostAsync(NSubmenuStack stack, CancellationToken cancelToken = default)
     {
         ulong myId = SteamUser.GetSteamID().m_SteamID;
         while (true)
@@ -104,6 +113,15 @@ public static class AutoMatchService
                     return AutoMatchResult.Join(found[0].LobbyId);
                 }
             }
+
+            // Same DC-crawler fallback as AutoMatchAsync, but restricted to is_rehost posts - see
+            // GuestMatchService.TryJoinRehostFromListAsync's own doc for why no other filtering applies here.
+            CSteamID? guestJoined = await GuestMatchService.TryJoinRehostFromListAsync(stack, cancelToken);
+            if (guestJoined.HasValue)
+            {
+                return AutoMatchResult.Joined(guestJoined.Value);
+            }
+
             await Task.Delay(TimeSpan.FromSeconds(3), cancelToken);
         }
     }
