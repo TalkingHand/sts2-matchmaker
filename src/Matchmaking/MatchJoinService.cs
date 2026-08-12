@@ -21,7 +21,12 @@ namespace Sts2Matchmaker.Matchmaking;
 /// </summary>
 public static class MatchJoinService
 {
-    public static async Task JoinLobbyAsync(NSubmenuStack stack, CSteamID lobbyId)
+    /// <param name="suppressErrorPopup">When true, silences the native NErrorPopup for the duration of the join
+    /// attempt (via GuestJoinErrorSuppression) - used by GuestMatchService, which tries several DC-crawled
+    /// candidates in a row and treats a failure here as "move on to the next one", not something the player needs
+    /// interrupted for. Regular manual joins leave this false so a failure is still visible (see this class's own
+    /// doc on why JoinAsync closes our own window first).</param>
+    public static async Task JoinLobbyAsync(NSubmenuStack stack, CSteamID lobbyId, bool suppressErrorPopup = false)
     {
         Log.Info($"[sts2_matchmaker] Joining matched lobby {lobbyId.m_SteamID}");
         var initializer = SteamClientConnectionInitializer.FromLobby(lobbyId.m_SteamID);
@@ -31,7 +36,22 @@ public static class MatchJoinService
         {
             throw new InvalidOperationException(Loc.Get("메인 메뉴를 찾을 수 없어 로비에 참가할 수 없습니다."));
         }
-        await mainMenu.JoinGame(initializer);
+
+        if (suppressErrorPopup)
+        {
+            GuestJoinErrorSuppression.Suppress = true;
+        }
+        try
+        {
+            await mainMenu.JoinGame(initializer);
+        }
+        finally
+        {
+            if (suppressErrorPopup)
+            {
+                GuestJoinErrorSuppression.Suppress = false;
+            }
+        }
 
         // JoinGame() itself unconditionally pushes NMultiplayerSubmenu then NJoinFriendScreen onto the stack
         // before the actual network join even begins (see NMainMenu.JoinGame), so comparing stack.Peek() to

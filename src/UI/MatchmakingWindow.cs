@@ -248,8 +248,11 @@ public class MatchmakingWindow : Sts2ModalPanel
                 SetBusyStatus(Loc.Get("발견된 로비에 접속 중"));
                 _ = JoinAsync(result.LobbyId!.Value);
                 break;
+            case AutoMatchOutcome.Joined:
             case AutoMatchOutcome.BecameHost:
-                // Hosting started successfully - hand off to the vanilla lobby screen and close this popup.
+                // Joined: GuestMatchService already completed the join internally (silent DC-candidate retry
+                // loop) - nothing left to do but close our popup, same as a successful host, since the game has
+                // already navigated to whatever screen the join landed on.
                 NModalContainer.Instance?.Clear();
                 break;
             case AutoMatchOutcome.Error:
@@ -278,11 +281,19 @@ public class MatchmakingWindow : Sts2ModalPanel
     {
         try
         {
-            AutoMatchResult result = await AutoMatchService.WaitForRehostAsync(cancelToken);
-            if (IsInstanceValid(this) && result.Outcome == AutoMatchOutcome.JoinExisting)
+            AutoMatchResult result = await AutoMatchService.WaitForRehostAsync(_stack, cancelToken);
+            if (IsInstanceValid(this))
             {
-                SetBusyStatus(Loc.Get("이어하기 로비 발견, 접속 중"));
-                _ = JoinAsync(result.LobbyId!.Value);
+                if (result.Outcome == AutoMatchOutcome.JoinExisting)
+                {
+                    SetBusyStatus(Loc.Get("이어하기 로비 발견, 접속 중"));
+                    _ = JoinAsync(result.LobbyId!.Value);
+                }
+                else if (result.Outcome == AutoMatchOutcome.Joined)
+                {
+                    // Already connected via GuestMatchService's DC-crawled rehost search - just close our popup.
+                    NModalContainer.Instance?.Clear();
+                }
             }
         }
         catch (OperationCanceledException)
