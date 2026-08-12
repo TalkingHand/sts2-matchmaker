@@ -155,7 +155,12 @@ public static class GuestMatchService
         {
             return false;
         }
-        if (settings.MaxPlayers != MatchTags.MaxPlayersAny && lobby.MaxPlayers.HasValue && lobby.MaxPlayers.Value != settings.MaxPlayers)
+        // Unlike ascension (missing = "no info, don't reject"), a DC post that never mentions player count is
+        // conventionally just a normal full room - the title only calls out a smaller target ("3인", "2인") when
+        // it's NOT the default. So null defaults to the game's own co-op max (4) rather than being treated as
+        // "unknown, matches anything" - a player who specifically wants a 2-person room shouldn't get matched
+        // into an unlabeled post that's actually a 4-person one.
+        if (settings.MaxPlayers != MatchTags.MaxPlayersAny && (lobby.MaxPlayers ?? 4) != settings.MaxPlayers)
         {
             return false;
         }
