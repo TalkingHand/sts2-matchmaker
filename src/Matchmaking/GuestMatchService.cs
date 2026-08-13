@@ -132,6 +132,14 @@ public static class GuestMatchService
             catch (Exception ex)
             {
                 Log.Info($"[sts2_matchmaker] Guest candidate {lobbyIdValue} (no={lobby.No}) failed, trying next: {ex.Message}");
+                // Without this, a join failure that's actually permanent (e.g. "run already started or invite
+                // cancelled" - the run started/closed between the metadata pre-check above and this actual join
+                // attempt) never gets remembered, so the very next poll cycle (GuestPollLoopAsync, on its own
+                // fixed cadence) sees the exact same candidate again, tries it again, fails again - forever, if
+                // it's the only candidate on the board. Same tracker the metadata pre-check above already uses,
+                // so this candidate gets the same "skip until the board itself stops listing it" treatment
+                // (GuestDeadCandidateTracker.Prune) regardless of which check caught it dead.
+                GuestDeadCandidateTracker.MarkDead(lobby.No);
                 // JoinLobbyAsync's underlying NMainMenu.JoinGame() unconditionally pushed NMultiplayerSubmenu +
                 // NJoinFriendScreen before failing (see MatchJoinService's own doc) - pop back to where we
                 // started so the next candidate begins from a clean stack instead of piling up dead screens.
