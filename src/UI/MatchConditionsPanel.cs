@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
@@ -21,6 +22,16 @@ namespace Sts2Matchmaker.UI;
 /// </summary>
 public class MatchConditionsPanel : VBoxContainer
 {
+    /// <summary>Fires whenever the player actually changes a value here (typing a community name, picking a
+    /// different language/game-mode/player-count) - NOT for LoadFrom's own programmatic restores, which set
+    /// controls directly without going through the user-input paths this hooks (LineEdit.Text assignment doesn't
+    /// raise TextChanged, and NativeDropdownField.SetValue explicitly skips its onChanged - see their own docs).
+    /// MatchmakingWindow/MatchConditionsWindow both subscribe this straight to MatchSettingsStore.Save, so a
+    /// setting is recorded the moment it's changed rather than only at confirm/close - previously a cancelled
+    /// search followed by leaving through any path other than the explicit close button lost whatever was typed,
+    /// since nothing had saved it yet.</summary>
+    public event Action? SettingsChanged;
+
     /// <summary>Friendly names for the game's most common language codes (MegaCrit.Sts2.Core.Localization.
     /// LocManager.Languages, ISO 639-2 3-letter codes) - anything not listed just shows its raw code.</summary>
     private static readonly Dictionary<string, string> FriendlyLanguageNames = new()
@@ -117,6 +128,7 @@ public class MatchConditionsPanel : VBoxContainer
             UpdateCommunitySuggestions();
             _communityRecordDebounceTimer.Stop();
             _communityRecordDebounceTimer.Start();
+            SettingsChanged?.Invoke();
         };
         _communityInput.FocusEntered += UpdateCommunitySuggestions;
 
@@ -128,7 +140,7 @@ public class MatchConditionsPanel : VBoxContainer
             string label = FriendlyLanguageNames.TryGetValue(code, out string? friendly) ? friendly : code;
             languageOptions.Add((label, code));
         }
-        _languageField = NativeDropdownField<string>.BuildOrFallback(languageOptions, currentLanguage, overlayParent: _overlayParent);
+        _languageField = NativeDropdownField<string>.BuildOrFallback(languageOptions, currentLanguage, _ => SettingsChanged?.Invoke(), _overlayParent);
         AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("언어"), _languageField.Control));
         AddChild(Sts2ModalPanel.BuildSettingsDivider());
 
@@ -143,7 +155,11 @@ public class MatchConditionsPanel : VBoxContainer
                 (Loc.Get("데일리"), GameMode.Daily),
                 (Loc.Get("커스텀"), GameMode.Custom),
             };
-            _gameModeField = NativeDropdownField<GameMode>.BuildOrFallback(gameModeOptions, GameMode.Standard, _ => UpdateMaxPlayersEnabled(), _overlayParent);
+            _gameModeField = NativeDropdownField<GameMode>.BuildOrFallback(gameModeOptions, GameMode.Standard, _ =>
+            {
+                UpdateMaxPlayersEnabled();
+                SettingsChanged?.Invoke();
+            }, _overlayParent);
             AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("런 종류"), _gameModeField.Control));
             AddChild(Sts2ModalPanel.BuildSettingsDivider());
         }
@@ -190,7 +206,7 @@ public class MatchConditionsPanel : VBoxContainer
             {
                 maxPlayersOptions.Add((Loc.Get("무관"), MatchTags.MaxPlayersAny));
             }
-            _maxPlayersField = NativeDropdownField<int>.BuildOrFallback(maxPlayersOptions, MatchHostService.DefaultMaxPlayers, overlayParent: _overlayParent);
+            _maxPlayersField = NativeDropdownField<int>.BuildOrFallback(maxPlayersOptions, MatchHostService.DefaultMaxPlayers, _ => SettingsChanged?.Invoke(), _overlayParent);
             AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("인원 수"), _maxPlayersField.Control));
             AddChild(Sts2ModalPanel.BuildSettingsDivider());
             UpdateMaxPlayersEnabled();

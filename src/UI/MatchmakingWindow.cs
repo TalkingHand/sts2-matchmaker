@@ -90,6 +90,14 @@ public class MatchmakingWindow : Sts2ModalPanel
         _conditions.LoadFrom(saved);
         _canHostCheck.ButtonPressed = saved.CanHost;
 
+        // Save on every actual change, not just at confirm/close - see MatchConditionsPanel.SettingsChanged's own
+        // doc for why relying solely on button presses lost changes whenever the window closed some other way
+        // (e.g. cancelling a search then backing out through the game's own menu navigation instead of this
+        // window's close button). Wired after the LoadFrom/ButtonPressed restores above so replaying the just-
+        // loaded values back into the store isn't mistaken for a real change.
+        _conditions.SettingsChanged += SaveCurrentSettings;
+        _canHostCheck.Toggled += _ => SaveCurrentSettings();
+
         // Row style matches settings_screen.tscn's own "Send Feedback" row exactly now (BuildSettingsRow: label
         // left, button right in a 64px MarginContainer; BuildSettingsActionButton: same reward_skip_button.png
         // background/shader/label styling as that row's own button, not the flat-color BuildTextActionButton

@@ -64,6 +64,9 @@ public class MatchConditionsWindow : Sts2ModalPanel
         pages[0].AddChild(panel._conditions);
         panel._conditions.Build();
         panel._conditions.LoadFrom(MatchSettingsStore.Load());
+        // Save on every actual change, not just at the toggle/close buttons - see MatchmakingWindow.BuildContent's
+        // matching wire-up and MatchConditionsPanel.SettingsChanged's own doc for why.
+        panel._conditions.SettingsChanged += () => panel.SaveCurrentSettings();
 
         // Last row in this tab, deliberately - a quick-share convenience, not a search condition, so it reads as a
         // trailing extra below community/language/인원 수 rather than competing with them for top billing. Same
