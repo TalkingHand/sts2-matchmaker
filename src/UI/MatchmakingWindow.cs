@@ -175,6 +175,10 @@ public class MatchmakingWindow : Sts2ModalPanel
     protected override void OnCloseRequested()
     {
         _pendingCts?.Cancel();
+        // Safety net for a close path that skips FocusExited entirely (e.g. a keybound back/Escape action) - see
+        // RecordCommunityIfNotEmpty's own doc for why this needs an explicit call here, not just the FocusExited
+        // hook inside MatchConditionsPanel itself.
+        _conditions.RecordCommunityIfNotEmpty();
         SaveCurrentSettings();
         base.OnCloseRequested();
     }

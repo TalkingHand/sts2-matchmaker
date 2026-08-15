@@ -59,7 +59,6 @@ public class MatchConditionsPanel : VBoxContainer
     private Control? _communitySuggestionPopup;
     private VBoxContainer? _communitySuggestionList;
     private Control? _communitySuggestionDismisser;
-    private Timer? _communityRecordDebounceTimer;
     private NativeDropdownField<string> _languageField = null!;
     private NativeDropdownField<GameMode>? _gameModeField;
     private NativeDropdownField<int>? _maxPlayersField;
@@ -105,29 +104,34 @@ public class MatchConditionsPanel : VBoxContainer
         // Live suggestions as you type, not a separate always-visible row - community matching is exact-string
         // equality (see MatchTags.NormalizeTag), so a single typo in this field silently creates an unreachable
         // new "community" nobody else can find; surfacing matches from RecentCommunityStore.Load() (names actually
-        // used before, recorded by ApplyTo below, and by the debounce timer below for same-session typing that
-        // never reaches ApplyTo) right under the cursor is what actually prevents that, the way a browser address
-        // bar's own history autocomplete does. Focusing the empty field shows the most recent few; typing narrows
-        // to substring matches.
+        // typed and settled on before, recorded solely by FocusExited below - see its own doc) right under the
+        // cursor is what actually prevents that, the way a browser address bar's own history autocomplete does.
+        // Focusing the empty field shows the most recent few; typing narrows to substring matches.
         _recentCommunities = RecentCommunityStore.Load();
 
-        // Records whatever's typed ~1.5s after the user stops typing, WITHOUT waiting for the whole window to
-        // close (ApplyTo's own trigger) - typing a new name, clicking elsewhere, then coming back to retype its
-        // start should already offer it, not just after a full close/reopen. Timer-based rather than hooking
-        // FocusExited: a suggestion click below also moves focus away from _communityInput, and FocusExited fires
-        // on that click's PRESS (before the item's own Pressed/release sets the final text), so recording there
-        // would capture the stale pre-click text instead - a plain elapsed-time debounce sidesteps that race
-        // entirely instead of trying to out-order it. Setting .Text programmatically (the suggestion-pick path)
-        // does not itself raise TextChanged in Godot, so picking a suggestion never restarts this timer.
-        _communityRecordDebounceTimer = new Timer { WaitTime = 1.5, OneShot = true };
-        _communityRecordDebounceTimer.Timeout += OnCommunityRecordDebounceTimeout;
-        AddChild(_communityRecordDebounceTimer);
+        // The only path that writes into RecentCommunityStore - records once the field actually loses focus.
+        // Deliberately NOT hooked to ApplyTo/SettingsChanged (see that event's own doc: it's for
+        // MatchSettingsStore.Save, an unrelated "persist whatever's currently typed" concern that legitimately
+        // does need every keystroke) and NOT re-triggered by picking a suggestion below either - an entry chosen
+        // from the list is by definition already in RecentCommunityStore (that's the only way it could be showing
+        // as a suggestion), and whatever was in the field before that click is text the player never actually
+        // committed to, so there's nothing new here worth recording either way.
+        //
+        // The actual .Text read is deferred, not done synchronously in this handler - a suggestion-item click
+        // below ALSO moves focus away from _communityInput, and this signal fires on that click's PRESS, strictly
+        // before the item's own Pressed/Released sets the field to its final text (see ShowCommunitySuggestions'
+        // own doc). Reading .Text right here would capture that stale pre-click text instead of whichever value
+        // the player actually ends up with. CallDeferred (same technique Sts2NativeDropdown.TryBuild and
+        // RecruitToggleInjector's own KeepLastDeferred use for an analogous same-frame ordering hazard) pushes the
+        // read to this frame's idle time, by which point the click's own Pressed handler has already run.
+        _communityInput.FocusExited += () => Callable.From(RecordCommunityIfNotEmpty).CallDeferred();
 
+        // Unrelated to the recording above - this is what actually keeps the suggestion popup live as the player
+        // types, and (via SettingsChanged) what MatchSettingsStore.Save persists on every keystroke so a
+        // cancelled search or a close-without-blurring-the-field doesn't lose whatever was typed.
         _communityInput.TextChanged += _ =>
         {
             UpdateCommunitySuggestions();
-            _communityRecordDebounceTimer.Stop();
-            _communityRecordDebounceTimer.Start();
             SettingsChanged?.Invoke();
         };
         _communityInput.FocusEntered += UpdateCommunitySuggestions;
@@ -235,14 +239,19 @@ public class MatchConditionsPanel : VBoxContainer
         ShowCommunitySuggestions(matches);
     }
 
-    private void OnCommunityRecordDebounceTimeout()
+    /// <summary>Public so both host windows' own OnCloseRequested can call this directly (not deferred - see
+    /// their own call sites) as a safety net alongside SaveCurrentSettings: FocusExited above only fires when
+    /// something ELSE first takes focus away from _communityInput (a click on another row, a suggestion, the
+    /// close button itself), so a close path that never does that first - a keybound "back"/Escape action, or the
+    /// whole window losing OS focus (e.g. alt-tabbing away) - would otherwise leave whatever's currently typed
+    /// unrecorded. Calling this again here is harmless even when FocusExited already fired first (e.g. clicking
+    /// the close button itself) - Record's own dedupe-by-normalized-name (see its doc) just moves the same entry
+    /// to the front a second time instead of duplicating it.</summary>
+    public void RecordCommunityIfNotEmpty()
     {
-        string trimmed = _communityInput.Text.Trim();
-        if (trimmed.Length == 0)
-        {
-            return;
-        }
-        RecentCommunityStore.Record(trimmed);
+        // Record itself already no-ops on empty/whitespace-only text (see its own doc) - no separate check needed
+        // here.
+        RecentCommunityStore.Record(_communityInput.Text);
         _recentCommunities = RecentCommunityStore.Load();
     }
 
@@ -271,14 +280,13 @@ public class MatchConditionsPanel : VBoxContainer
             Sts2ModalPanel.StyleAsSettingsButton(itemButton);
             itemButton.Pressed += () =>
             {
+                // No RecentCommunityStore.Record here - name is already in that store (it's the only way it could
+                // have shown up as a suggestion to click in the first place), and whatever was in the field before
+                // this click is text the player typed but never actually committed to, not something worth
+                // recording either. See the debounce timer's own doc for the full reasoning.
                 _communityInput.Text = name;
                 _communityInput.CaretColumn = name.Length;
                 HideCommunitySuggestions();
-                // Re-records immediately (not just relying on the debounce timer, which .Text's programmatic set
-                // above never restarts anyway - see the TextChanged doc) so a picked entry re-sorts to the front
-                // and stays available right away, not just after the next window close.
-                RecentCommunityStore.Record(name);
-                _recentCommunities = RecentCommunityStore.Load();
             };
             _communitySuggestionList.AddChild(itemButton);
         }
@@ -409,10 +417,16 @@ public class MatchConditionsPanel : VBoxContainer
     public GameMode SelectedGameMode => _gameModeField?.Value ?? GameMode.Standard;
     public int SelectedMaxPlayers => _maxPlayersField?.Value ?? MatchHostService.DefaultMaxPlayers;
 
+    /// <summary>Does NOT call RecentCommunityStore.Record - that's the debounce timer's job (and the suggestion-
+    /// click handler's), not this method's. ApplyTo runs on every SettingsChanged tick (see that event's own doc -
+    /// SaveCurrentSettings is wired straight to it in both host windows), which is exactly right for
+    /// settings.Community/MatchSettingsStore.Save (persisting whatever's currently typed so a cancel-and-reopen
+    /// doesn't lose it), but calling Record from here too meant every single keystroke got written into the
+    /// autocomplete history, not just once the player actually settled on a name - the debounce timer already
+    /// exists specifically to avoid that (see its own doc for why a plain FocusExited hook isn't used instead).</summary>
     public void ApplyTo(MatchSettings settings)
     {
         settings.Community = Community;
-        RecentCommunityStore.Record(Community);
         settings.Language = Language;
         settings.RequireModMatch = RequireModMatch;
         settings.Ascension = SelectedAscension;

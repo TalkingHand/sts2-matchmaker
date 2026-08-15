@@ -235,6 +235,10 @@ public class MatchConditionsWindow : Sts2ModalPanel
 
     protected override void OnCloseRequested()
     {
+        // Safety net for a close path that skips FocusExited entirely (e.g. the engine-level cancel/ESC action
+        // referenced below) - see MatchConditionsPanel.RecordCommunityIfNotEmpty's own doc for why this needs an
+        // explicit call here, not just the FocusExited hook inside that panel itself.
+        _conditions.RecordCommunityIfNotEmpty();
         SaveCurrentSettings();
         // Must stay open for the whole duration of an active search - ApplyConfirmCancelState already disables
         // CloseButton while _isOpenToMatching (so a normal click can't reach here), but this is a defensive second
