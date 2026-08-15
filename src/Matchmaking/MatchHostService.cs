@@ -101,7 +101,7 @@ public static class MatchHostService
 
     private static async Task<(string? error, NetHostGameService? netService, CSteamID lobbyId)> CreateAndTagLobbyAsync(string communityName, string language, GameMode gameMode, int maxPlayers, string kind, int ascension)
     {
-        var netService = new NetHostGameService();
+        var netService = new NetHostGameService(PeerVersionInfo.LocalDefault());
         NetErrorInfo? err = await netService.StartSteamHost(maxPlayers);
         if (err.HasValue)
         {

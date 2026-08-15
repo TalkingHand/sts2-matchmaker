@@ -152,20 +152,23 @@ public static class RecruitToggleInjector
                 {
                     return;
                 }
-                // ResolveRoomMaxPlayers, not the saved setting as-is: it can be MatchTags.MaxPlayersAny ("무관",
-                // in which case the effective target just falls back to the room's own real capacity - see that
-                // method's own doc for why this mirrors ResolveRoomAscension's handling of AscensionAny).
-                int targetMaxPlayers = MatchLobbyTagging.ResolveRoomMaxPlayers(lobby.MaxPlayers, MatchSettingsStore.Load().MaxPlayers);
-                if (!MatchConditionsWindow.ComputeIsOpenToMatching(lobby) || lobby.Players.Count < targetMaxPlayers)
-                {
-                    return;
-                }
                 string? rawId = lobby.NetService.GetRawLobbyIdentifier();
                 if (rawId == null || !ulong.TryParse(rawId, out ulong idValue))
                 {
                     return;
                 }
-                MatchLobbyTagging.RemoveFromSearch(new CSteamID(idValue));
+                var id = new CSteamID(idValue);
+                // ResolveRoomMaxPlayers, not the saved setting as-is: it can be MatchTags.MaxPlayersAny ("무관",
+                // in which case the effective target just falls back to the room's own real capacity - see that
+                // method's own doc for why this mirrors ResolveRoomAscension's handling of AscensionAny). The
+                // room's real capacity comes from Steam's own lobby member limit, not StartRunLobby (which no
+                // longer exposes MaxPlayers at all - it's a private field there now).
+                int targetMaxPlayers = MatchLobbyTagging.ResolveRoomMaxPlayers(SteamMatchmaking.GetLobbyMemberLimit(id), MatchSettingsStore.Load().MaxPlayers);
+                if (!MatchConditionsWindow.ComputeIsOpenToMatching(lobby) || lobby.Players.Count < targetMaxPlayers)
+                {
+                    return;
+                }
+                MatchLobbyTagging.RemoveFromSearch(id);
                 Log.Info($"[sts2_matchmaker] Lobby {idValue} reached its matching target ({lobby.Players.Count}/{targetMaxPlayers}) - auto-closed from matching search");
                 MatchSfx.PlayMatchFoundSfx(wrapper);
 

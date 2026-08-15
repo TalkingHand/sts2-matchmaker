@@ -167,12 +167,12 @@ public class MatchConditionsWindow : Sts2ModalPanel
             // settings.MaxPlayers (the "인원 수" configured on this very screen), resolved through
             // ResolveRoomMaxPlayers - NOT used as-is, since it can be MatchTags.MaxPlayersAny ("무관", only offered
             // here, never in the host-capable main matching popup - see MatchConditionsPanel's own class doc) or a
-            // real pick that still needs clamping to what the room can actually hold (_lobby.MaxPlayers, the room's
-            // real fixed-at-creation capacity - StartRunLobby.MaxPlayers has no setter). See
-            // RecruitToggleInjector.CheckPlayerLimitNow, which resolves the same saved setting the same way for the
-            // auto-stop-when-full check.
+            // real pick that still needs clamping to what the room can actually hold (Steam's own lobby member
+            // limit, the room's real fixed-at-creation capacity - StartRunLobby no longer exposes MaxPlayers at all,
+            // it's a private field there now). See RecruitToggleInjector.CheckPlayerLimitNow, which resolves the
+            // same saved setting the same way for the auto-stop-when-full check.
             MatchLobbyTagging.ApplyTags(lobbyId, settings.Community, language, _lobby.GameMode,
-                MatchLobbyTagging.ResolveRoomMaxPlayers(_lobby.MaxPlayers, settings.MaxPlayers), MatchTags.KindFresh,
+                MatchLobbyTagging.ResolveRoomMaxPlayers(SteamMatchmaking.GetLobbyMemberLimit(lobbyId), settings.MaxPlayers), MatchTags.KindFresh,
                 MatchLobbyTagging.ResolveRoomAscension(_lobby.MaxAscension, settings.Ascension));
             _ = BanTagSync.MergeMyBansIntoLobbyAsync(lobbyId);
             Log.Info($"[sts2_matchmaker] Opened existing lobby {lobbyIdValue} to matchmaking search");
