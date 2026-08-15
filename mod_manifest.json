@@ -3,7 +3,7 @@
   "name": "Match Maker",
   "author": "remesto",
   "description": "Tag-based Steam lobby matchmaking (community name, required-mod match) for Slay the Spire 2 multiplayer.",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "has_pck": false,
   "has_dll": true,
   "dependencies": [],
