@@ -1,10 +1,10 @@
 using System;
 using Godot;
-using MegaCrit.Sts2.Core.Entities.Multiplayer;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Multiplayer.Game.Lobby;
 using MegaCrit.Sts2.Core.Nodes.Multiplayer;
+using Sts2Matchmaker.Helpers;
 using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 using Steamworks;
@@ -124,14 +124,19 @@ public static class RecruitToggleInjector
                 MatchLobbyTagging.UpdateAscensionTag(id, roomAscension);
                 Log.Info($"[sts2_matchmaker] Roster changed, re-tagged lobby {idValue} ascension={roomAscension} (room ceiling {lobby.MaxAscension})");
             }
-            void OnRosterChangedRetagAscension(StartRunLobbyPlayer _) => Callable.From(RetagAscensionNow).CallDeferred();
+            void OnRosterChangedRetagAscension() => Callable.From(RetagAscensionNow).CallDeferred();
 
-            lobby.PlayerConnected += OnRosterChangedRetagAscension;
-            lobby.PlayerDisconnected += OnRosterChangedRetagAscension;
+            // PlayerConnected/PlayerDisconnected's argument type (LobbyPlayer on general, StartRunLobbyPlayer on
+            // beta) differs between game branches, so a plain "+=" here would bake whichever type this assembly
+            // was compiled against into our metadata and throw ReflectionTypeLoadException on the other branch.
+            // GameEventCompat subscribes via reflection instead, discovering the real delegate type at runtime -
+            // safe since these handlers never look at the argument anyway.
+            Delegate retagConnectedHandler = GameEventCompat.Subscribe(lobby, nameof(StartRunLobby.PlayerConnected), OnRosterChangedRetagAscension);
+            Delegate retagDisconnectedHandler = GameEventCompat.Subscribe(lobby, nameof(StartRunLobby.PlayerDisconnected), OnRosterChangedRetagAscension);
             wrapper.TreeExiting += () =>
             {
-                lobby.PlayerConnected -= OnRosterChangedRetagAscension;
-                lobby.PlayerDisconnected -= OnRosterChangedRetagAscension;
+                GameEventCompat.Unsubscribe(lobby, nameof(StartRunLobby.PlayerConnected), retagConnectedHandler);
+                GameEventCompat.Unsubscribe(lobby, nameof(StartRunLobby.PlayerDisconnected), retagDisconnectedHandler);
             };
 
             // Auto-stop matching once the room reaches the "인원 수" configured in matching options - primarily NOT
@@ -164,12 +169,13 @@ public static class RecruitToggleInjector
                 // room's real capacity comes from Steam's own lobby member limit, not StartRunLobby (which no
                 // longer exposes MaxPlayers at all - it's a private field there now).
                 int targetMaxPlayers = MatchLobbyTagging.ResolveRoomMaxPlayers(SteamMatchmaking.GetLobbyMemberLimit(id), MatchSettingsStore.Load().MaxPlayers);
-                if (!MatchConditionsWindow.ComputeIsOpenToMatching(lobby) || lobby.Players.Count < targetMaxPlayers)
+                int currentPlayerCount = StartRunLobbyCompat.GetPlayerCount(lobby);
+                if (!MatchConditionsWindow.ComputeIsOpenToMatching(lobby) || currentPlayerCount < targetMaxPlayers)
                 {
                     return;
                 }
                 MatchLobbyTagging.RemoveFromSearch(id);
-                Log.Info($"[sts2_matchmaker] Lobby {idValue} reached its matching target ({lobby.Players.Count}/{targetMaxPlayers}) - auto-closed from matching search");
+                Log.Info($"[sts2_matchmaker] Lobby {idValue} reached its matching target ({currentPlayerCount}/{targetMaxPlayers}) - auto-closed from matching search");
                 MatchSfx.PlayMatchFoundSfx(wrapper);
 
                 // If the matching-conditions screen happens to be open right now, it was blocking its own close
@@ -179,12 +185,12 @@ public static class RecruitToggleInjector
                 // 취소" control.
                 MatchConditionsWindow.CloseIfOpen();
             }
-            void OnRosterChangedCheckPlayerLimit(StartRunLobbyPlayer _) => Callable.From(CheckPlayerLimitNow).CallDeferred();
+            void OnRosterChangedCheckPlayerLimit() => Callable.From(CheckPlayerLimitNow).CallDeferred();
 
-            lobby.PlayerConnected += OnRosterChangedCheckPlayerLimit;
+            Delegate limitCheckHandler = GameEventCompat.Subscribe(lobby, nameof(StartRunLobby.PlayerConnected), OnRosterChangedCheckPlayerLimit);
             wrapper.TreeExiting += () =>
             {
-                lobby.PlayerConnected -= OnRosterChangedCheckPlayerLimit;
+                GameEventCompat.Unsubscribe(lobby, nameof(StartRunLobby.PlayerConnected), limitCheckHandler);
             };
 
             if (flowContainer != null)
@@ -199,7 +205,7 @@ public static class RecruitToggleInjector
                     }
                 }
                 void KeepLastDeferred() => Callable.From(KeepLastNow).CallDeferred();
-                void OnPlayerRosterChanged(StartRunLobbyPlayer _) => KeepLastDeferred();
+                void OnPlayerRosterChanged() => KeepLastDeferred();
                 void OnSiblingEnteredTree(Node node)
                 {
                     // SoloLabel/InviteButtonContainer/player cards can finish populating a frame after we run (our
@@ -213,15 +219,15 @@ public static class RecruitToggleInjector
                 }
 
                 flowContainer.ChildEnteredTree += OnSiblingEnteredTree;
-                lobby.PlayerConnected += OnPlayerRosterChanged;
-                lobby.PlayerDisconnected += OnPlayerRosterChanged;
+                Delegate keepLastConnectedHandler = GameEventCompat.Subscribe(lobby, nameof(StartRunLobby.PlayerConnected), OnPlayerRosterChanged);
+                Delegate keepLastDisconnectedHandler = GameEventCompat.Subscribe(lobby, nameof(StartRunLobby.PlayerDisconnected), OnPlayerRosterChanged);
                 KeepLastDeferred();
 
                 wrapper.TreeExiting += () =>
                 {
                     flowContainer.ChildEnteredTree -= OnSiblingEnteredTree;
-                    lobby.PlayerConnected -= OnPlayerRosterChanged;
-                    lobby.PlayerDisconnected -= OnPlayerRosterChanged;
+                    GameEventCompat.Unsubscribe(lobby, nameof(StartRunLobby.PlayerConnected), keepLastConnectedHandler);
+                    GameEventCompat.Unsubscribe(lobby, nameof(StartRunLobby.PlayerDisconnected), keepLastDisconnectedHandler);
                 };
             }
             else

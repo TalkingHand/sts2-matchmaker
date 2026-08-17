@@ -3,6 +3,7 @@ using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer.Game.Lobby;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using Sts2Matchmaker.Helpers;
 using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 using Steamworks;
@@ -57,10 +58,14 @@ public class MatchConditionsWindow : Sts2ModalPanel
         // room. ShowMaxPlayers: true - unlike GameMode, this is NOT StartRunLobby.MaxPlayers (also fixed, the
         // room's real capacity) but a separate "매칭 목표 인원수" search-stop threshold, meaningful and editable
         // here regardless of the room's actual size (see MatchConditionsPanel's own class doc).
-        // currentLobbyPlayerCount: lobby.Players.Count - excludes any "인원 수" option the room has already met or
-        // passed (see MatchConditionsPanel's own constructor doc), a snapshot taken once here at open time rather
-        // than tracked live while the window stays open.
-        panel._conditions = new MatchConditionsPanel(showGameMode: false, showMaxPlayers: true, currentLobbyPlayerCount: lobby.Players.Count, overlayParent: panel);
+        // currentLobbyPlayerCount: StartRunLobbyCompat.GetPlayerCount(lobby), not "lobby.Players.Count" directly -
+        // StartRunLobby.Players is List<LobbyPlayer> on general vs List<StartRunLobbyPlayer> on beta (same name,
+        // different closed generic type), which throws MissingMethodException at the JIT's first attempt to
+        // resolve get_Players() on whichever branch this assembly wasn't built against - see StartRunLobbyCompat.
+        // Excludes any "인원 수" option the room has already met or passed (see MatchConditionsPanel's own
+        // constructor doc), a snapshot taken once here at open time rather than tracked live while the window
+        // stays open.
+        panel._conditions = new MatchConditionsPanel(showGameMode: false, showMaxPlayers: true, currentLobbyPlayerCount: StartRunLobbyCompat.GetPlayerCount(lobby), overlayParent: panel);
         pages[0].AddChild(panel._conditions);
         panel._conditions.Build();
         panel._conditions.LoadFrom(MatchSettingsStore.Load());

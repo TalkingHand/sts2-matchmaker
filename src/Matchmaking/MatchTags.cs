@@ -4,8 +4,8 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using MegaCrit.Sts2.Core.Modding;
-using MegaCrit.Sts2.Core.Multiplayer;
 using MegaCrit.Sts2.Core.Saves;
+using Sts2Matchmaker.Helpers;
 
 namespace Sts2Matchmaker.Matchmaking;
 
@@ -102,7 +102,7 @@ public static class MatchTags
     /// </summary>
     public static string CurrentVersionTag()
     {
-        return NormalizeTag(PeerVersionInfo.LocalDefault().version);
+        return NormalizeTag(GameVersionCompat.GetCurrentVersionTag());
     }
 
     /// <summary>

@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.Nodes.Screens.CustomRun;
 using MegaCrit.Sts2.Core.Nodes.Screens.DailyRun;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
 using MegaCrit.Sts2.Core.Runs;
+using Sts2Matchmaker.Helpers;
 using Sts2Matchmaker.Localization;
 using Steamworks;
 
@@ -101,7 +102,7 @@ public static class MatchHostService
 
     private static async Task<(string? error, NetHostGameService? netService, CSteamID lobbyId)> CreateAndTagLobbyAsync(string communityName, string language, GameMode gameMode, int maxPlayers, string kind, int ascension)
     {
-        var netService = new NetHostGameService(PeerVersionInfo.LocalDefault());
+        var netService = GameVersionCompat.CreateNetHostGameService();
         NetErrorInfo? err = await netService.StartSteamHost(maxPlayers);
         if (err.HasValue)
         {

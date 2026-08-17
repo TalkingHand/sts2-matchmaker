@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Multiplayer.Game.Lobby;
 using MegaCrit.Sts2.Core.Nodes.Multiplayer;
+using Sts2Matchmaker.Helpers;
 using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 using Sts2Matchmaker.UI;
@@ -28,10 +29,16 @@ namespace Sts2Matchmaker.Patches;
 public static class RemoteLobbyPlayerKickPatch
 {
     [HarmonyPostfix]
-    public static void Postfix(NRemoteLobbyPlayerContainer __instance, StartRunLobbyPlayer player)
+    public static void Postfix(NRemoteLobbyPlayerContainer __instance, object player)
     {
         try
         {
+            // player's declared type (LobbyPlayer on general, StartRunLobbyPlayer on beta) differs between game
+            // branches - same struct shape, different name - so it's received as object and read via
+            // LobbyPlayerCompat instead of baking either type name into this method's signature (which would
+            // throw ReflectionTypeLoadException on whichever branch doesn't have that exact type).
+            ulong peerId = LobbyPlayerCompat.GetId(player);
+
             StartRunLobby? lobby = Traverse.Create(__instance).Field("_lobby").GetValue<StartRunLobby>();
             if (lobby == null)
             {
@@ -39,20 +46,18 @@ public static class RemoteLobbyPlayerKickPatch
             }
 
             bool isHost = lobby.NetService.Type == NetGameType.Host;
-            bool isSelf = player.id == lobby.NetService.NetId;
+            bool isSelf = peerId == lobby.NetService.NetId;
             if (isSelf)
             {
                 return;
             }
 
             List<NRemoteLobbyPlayer>? nodes = Traverse.Create(__instance).Field("_nodes").GetValue<List<NRemoteLobbyPlayer>>();
-            NRemoteLobbyPlayer? row = nodes?.LastOrDefault(n => n.PlayerId == player.id);
+            NRemoteLobbyPlayer? row = nodes?.LastOrDefault(n => n.PlayerId == peerId);
             if (row == null || row.GetNodeOrNull("Sts2MatchmakerModerationRow") != null)
             {
                 return;
             }
-
-            ulong peerId = player.id;
 
             // RE-APPLIED (was briefly reverted while the invite-button disappearance was suspected to be caused by
             // this positioning - currently being independently verified as possibly unrelated to this code).

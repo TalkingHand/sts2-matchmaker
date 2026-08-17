@@ -1,12 +1,12 @@
 using System;
 using Godot;
 using HarmonyLib;
-using MegaCrit.Sts2.Core.Entities.Multiplayer;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer.Game.Lobby;
 using MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect;
 using MegaCrit.Sts2.Core.Nodes.Screens.CustomRun;
 using MegaCrit.Sts2.Core.Nodes.Screens.DailyRun;
+using Sts2Matchmaker.Helpers;
 
 namespace Sts2Matchmaker.Patches;
 
@@ -34,11 +34,12 @@ internal static class RehostAutoReadyShared
             {
                 return;
             }
-            if (lobby.PlayerCount < lobby.Run.Players.Count)
+            int connectedPlayerCount = LoadRunLobbyCompat.GetConnectedPlayerCount(lobby);
+            if (connectedPlayerCount < lobby.Run.Players.Count)
             {
                 return;
             }
-            Log.Info($"[sts2_matchmaker] Rehost roster complete ({lobby.PlayerCount}/{lobby.Run.Players.Count}) - auto-readying");
+            Log.Info($"[sts2_matchmaker] Rehost roster complete ({connectedPlayerCount}/{lobby.Run.Players.Count}) - auto-readying");
             lobby.SetReady(true);
         }
         catch (Exception ex)
@@ -63,7 +64,7 @@ public static class MultiplayerLoadGameAutoReadyPatch
 
     [HarmonyPatch("PlayerConnected")]
     [HarmonyPostfix]
-    public static void PlayerConnectedPostfix(NMultiplayerLoadGameScreen __instance, LoadRunLobbyPlayer player) =>
+    public static void PlayerConnectedPostfix(NMultiplayerLoadGameScreen __instance) =>
         RehostAutoReadyShared.ReadyUpIfRosterComplete(Traverse.Create(__instance).Field("_runLobby").GetValue<LoadRunLobby>());
 }
 
@@ -82,7 +83,7 @@ public static class DailyRunLoadAutoReadyPatch
 
     [HarmonyPatch("PlayerConnected")]
     [HarmonyPostfix]
-    public static void PlayerConnectedPostfix(NDailyRunLoadScreen __instance, LoadRunLobbyPlayer player) =>
+    public static void PlayerConnectedPostfix(NDailyRunLoadScreen __instance) =>
         RehostAutoReadyShared.ReadyUpIfRosterComplete(Traverse.Create(__instance).Field("_lobby").GetValue<LoadRunLobby>());
 }
 
@@ -101,6 +102,6 @@ public static class CustomRunLoadAutoReadyPatch
 
     [HarmonyPatch("PlayerConnected")]
     [HarmonyPostfix]
-    public static void PlayerConnectedPostfix(NCustomRunLoadScreen __instance, LoadRunLobbyPlayer player) =>
+    public static void PlayerConnectedPostfix(NCustomRunLoadScreen __instance) =>
         RehostAutoReadyShared.ReadyUpIfRosterComplete(Traverse.Create(__instance).Field("_lobby").GetValue<LoadRunLobby>());
 }
