@@ -2,7 +2,7 @@
   "title": "Match Maker",
   "description": "A mod that improves multiplayer convenience and adds automatic matchmaking.\nMatch multiplayer lobbies based on community name / language / ascension / player count / installed mods, or use quick rehosting and kick/ban features.\n\nDoesn't affect gameplay, so you can freely play with people who don't have it installed.\n\nhttps://github.com/TalkingHand/sts2-matchmaker",
   "visibility": "public",
-  "changeNote": "Fixed hosting/matching being broken by a recent game update (NetHostGameService/StartRunLobby API changes). Added SteamID64 support to the ban list: add a ban directly by ID, or import/export your list as a plain text file (with nickname/reason fields) via Windows' native file picker. Fixed the community name field recording every keystroke into its autocomplete history instead of only once you're done typing.",
+  "changeNote": "Fixed the mod failing to load entirely for players on the general (non-beta) branch, and the in-lobby matching-conditions window not opening after auto-hosting - both caused by general and public-beta having slightly different internal type names/shapes that the previous fix didn't fully account for.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
