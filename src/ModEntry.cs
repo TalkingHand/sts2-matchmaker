@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using HarmonyLib;
@@ -25,7 +24,7 @@ public static class ModEntry
     private static void Initialize()
     {
         var harmony = new Harmony("remesto.sts2_matchmaker");
-        Type[] patchTypes = GetLoadableTypes(Assembly.GetExecutingAssembly())
+        Type[] patchTypes = Assembly.GetExecutingAssembly().GetTypes()
             .Where(type => type.GetCustomAttributes(typeof(HarmonyAttribute), inherit: true).Length > 0)
             .ToArray();
 
@@ -39,29 +38,6 @@ public static class ModEntry
             {
                 Log.Error($"[sts2_matchmaker] Failed to apply patch class {type.Name} - the feature it belongs to will be disabled, but the rest of the mod keeps working:\n{ex}");
             }
-        }
-    }
-
-    /// <summary>
-    /// Assembly.GetTypes() throws ReflectionTypeLoadException - for the whole assembly, before returning anything -
-    /// the moment a single type in it fails to load (e.g. a patch class whose Prefix/Postfix signature references a
-    /// game type/member MegaCrit renamed or removed). Left uncaught, that one broken class would take down every
-    /// other patch along with it, defeating the per-class isolation this file exists for. Recover by returning
-    /// whichever types DID load successfully (ex.Types contains null entries for the failures) and logging the rest.
-    /// </summary>
-    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
-    {
-        try
-        {
-            return assembly.GetTypes();
-        }
-        catch (ReflectionTypeLoadException ex)
-        {
-            foreach (Exception? loaderException in ex.LoaderExceptions)
-            {
-                Log.Error($"[sts2_matchmaker] A type failed to load, its patch class (if any) will be disabled, but the rest of the mod keeps working:\n{loaderException}");
-            }
-            return ex.Types.Where(type => type != null)!;
         }
     }
 }
