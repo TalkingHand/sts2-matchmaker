@@ -2,7 +2,7 @@
   "title": "Match Maker",
   "description": "A mod that improves multiplayer convenience and adds automatic matchmaking.\nMatch multiplayer lobbies based on community name / language / ascension / player count / installed mods, or use quick rehosting and kick/ban features.\n\nDoesn't affect gameplay, so you can freely play with people who don't have it installed.\n\nhttps://github.com/TalkingHand/sts2-matchmaker",
   "visibility": "public",
-  "changeNote": "Fixed the mod failing to load entirely for players on the general (non-beta) branch, and the in-lobby matching-conditions window not opening after auto-hosting - both caused by general and public-beta having slightly different internal type names/shapes that the previous fix didn't fully account for.",
+  "changeNote": "Updated for the game's v0.113.0 patch: added Blitz to matchmaking (shown once Blitz is unlocked, using your Blitz ascension), fixed Custom lobbies being tagged as the wrong mode after the game moved Custom out of its game-mode list, and fixed the matching menu button image and the cancel button icon showing the wrong art.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
