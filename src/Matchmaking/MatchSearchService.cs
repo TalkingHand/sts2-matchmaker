@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer.Transport.Steam;
-using MegaCrit.Sts2.Core.Runs;
 using Steamworks;
 
 namespace Sts2Matchmaker.Matchmaking;
@@ -59,9 +58,9 @@ public readonly struct AscensionSearchFilter
     /// the people who were in that save (and who therefore already cleared its ascension).</summary>
     public static AscensionSearchFilter None => new(null, null);
 
-    public static AscensionSearchFilter For(int preferredAscension) =>
+    public static AscensionSearchFilter For(int preferredAscension, MatchMode gameMode) =>
         preferredAscension == MatchTags.AscensionAny
-            ? new AscensionSearchFilter(null, MatchTags.LocalMaxAscension)
+            ? new AscensionSearchFilter(null, MatchTags.LocalMaxAscension(gameMode))
             : new AscensionSearchFilter(preferredAscension, null);
 }
 
@@ -83,7 +82,7 @@ public static class MatchSearchService
         string kind = MatchTags.KindFresh,
         string? language = null,
         ELobbyDistanceFilter region = ELobbyDistanceFilter.k_ELobbyDistanceFilterDefault,
-        GameMode gameMode = GameMode.Standard,
+        MatchMode gameMode = MatchMode.Standard,
         AscensionSearchFilter ascension = default,
         ulong? requireParticipantId = null,
         CancellationToken cancelToken = default)
@@ -228,7 +227,7 @@ public static class MatchSearchService
         int? maxPlayers,
         string kind,
         string? language,
-        GameMode gameMode,
+        MatchMode gameMode,
         AscensionSearchFilter ascension = default,
         CancellationToken cancelToken = default)
     {

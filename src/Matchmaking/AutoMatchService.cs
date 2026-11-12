@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
-using MegaCrit.Sts2.Core.Runs;
+using Sts2Matchmaker.Helpers;
 using Steamworks;
 
 namespace Sts2Matchmaker.Matchmaking;
@@ -76,7 +76,7 @@ public static class AutoMatchService
                 using var searchCts = CancellationTokenSource.CreateLinkedTokenSource(cancelToken);
                 Task<List<MatchLobbyInfo>> searchTask = MatchSearchService.SearchWithProgressiveRegionAsync(
                     settings.Community, settings.RequireModMatch, SearchMaxPlayers(settings), MatchTags.KindFresh, settings.Language, settings.GameMode,
-                    AscensionSearchFilter.For(settings.Ascension), searchCts.Token);
+                    AscensionSearchFilter.For(settings.Ascension, settings.GameMode), searchCts.Token);
 
                 Task winner = await Task.WhenAny(guestLoopTask, searchTask);
                 if (winner == guestLoopTask)
@@ -113,7 +113,7 @@ public static class AutoMatchService
                 using var recheckCts = CancellationTokenSource.CreateLinkedTokenSource(cancelToken);
                 Task<List<MatchLobbyInfo>> recheckTask = MatchSearchService.SearchWithProgressiveRegionAsync(
                     settings.Community, settings.RequireModMatch, SearchMaxPlayers(settings), MatchTags.KindFresh, settings.Language, settings.GameMode,
-                    AscensionSearchFilter.For(settings.Ascension), recheckCts.Token);
+                    AscensionSearchFilter.For(settings.Ascension, settings.GameMode), recheckCts.Token);
 
                 Task recheckWinner = await Task.WhenAny(guestLoopTask, recheckTask);
                 if (recheckWinner == guestLoopTask)
@@ -298,13 +298,17 @@ public static class AutoMatchService
         }
     }
 
-    /// <summary>One pass across all 3 modes, then a pacing delay before returning empty - unlike the fresh-match
-    /// progressive-region search, this has no built-in inter-step delay of its own (just 3 plain Steam queries), so
+    /// <summary>One pass across every mode this game build has (Blitz/Dread only exist on v0.113.0+ - see
+    /// GameModeCompat), then a pacing delay before returning empty - unlike the fresh-match
+    /// progressive-region search, this has no built-in inter-step delay of its own (just a few plain Steam queries), so
     /// it needs one explicitly to avoid hammering RequestLobbyList in a tight loop once decoupled from the guest
     /// loop's own cadence.</summary>
     private static async Task<MatchLobbyInfo?> SearchRehostAcrossModesAsync(ulong myId, CancellationToken cancelToken)
     {
-        foreach (GameMode mode in new[] { GameMode.Standard, GameMode.Daily, GameMode.Custom })
+        MatchMode[] modes = GameModeCompat.BlitzScreenType != null
+            ? new[] { MatchMode.Standard, MatchMode.Daily, MatchMode.Custom, MatchMode.Blitz, MatchMode.Dread }
+            : new[] { MatchMode.Standard, MatchMode.Daily, MatchMode.Custom };
+        foreach (MatchMode mode in modes)
         {
             List<MatchLobbyInfo> found = await MatchSearchService.SearchAsync(
                 communityFilter: null, requireModMatch: false, maxPlayers: null, MatchTags.KindRehost, language: null,

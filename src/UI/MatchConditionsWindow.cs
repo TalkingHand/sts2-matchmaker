@@ -65,7 +65,7 @@ public class MatchConditionsWindow : Sts2ModalPanel
         // Excludes any "인원 수" option the room has already met or passed (see MatchConditionsPanel's own
         // constructor doc), a snapshot taken once here at open time rather than tracked live while the window
         // stays open.
-        panel._conditions = new MatchConditionsPanel(showGameMode: false, showMaxPlayers: true, currentLobbyPlayerCount: StartRunLobbyCompat.GetPlayerCount(lobby), overlayParent: panel);
+        panel._conditions = new MatchConditionsPanel(showGameMode: false, showMaxPlayers: true, currentLobbyPlayerCount: StartRunLobbyCompat.GetPlayerCount(lobby), overlayParent: panel, fixedGameMode: GameModeCompat.FromLobby(lobby));
         pages[0].AddChild(panel._conditions);
         panel._conditions.Build();
         panel._conditions.LoadFrom(MatchSettingsStore.Load());
@@ -176,7 +176,7 @@ public class MatchConditionsWindow : Sts2ModalPanel
             // limit, the room's real fixed-at-creation capacity - StartRunLobby no longer exposes MaxPlayers at all,
             // it's a private field there now). See RecruitToggleInjector.CheckPlayerLimitNow, which resolves the
             // same saved setting the same way for the auto-stop-when-full check.
-            MatchLobbyTagging.ApplyTags(lobbyId, settings.Community, language, _lobby.GameMode,
+            MatchLobbyTagging.ApplyTags(lobbyId, settings.Community, language, GameModeCompat.FromLobby(_lobby),
                 MatchLobbyTagging.ResolveRoomMaxPlayers(SteamMatchmaking.GetLobbyMemberLimit(lobbyId), settings.MaxPlayers), MatchTags.KindFresh,
                 MatchLobbyTagging.ResolveRoomAscension(_lobby.MaxAscension, settings.Ascension));
             _ = BanTagSync.MergeMyBansIntoLobbyAsync(lobbyId);

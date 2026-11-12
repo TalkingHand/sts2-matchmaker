@@ -7,7 +7,6 @@ using MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect;
 using MegaCrit.Sts2.Core.Nodes.Screens.CustomRun;
 using MegaCrit.Sts2.Core.Nodes.Screens.DailyRun;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
-using MegaCrit.Sts2.Core.Runs;
 using Sts2Matchmaker.Helpers;
 using Sts2Matchmaker.Localization;
 using Steamworks;
@@ -38,15 +37,15 @@ public static class MatchHostService
     /// here - it's still set before that point either way.</summary>
     public static bool OpenMatchingWindowOnNextInject;
 
-    public static async Task<HostResult> StartFreshHostAsync(NSubmenuStack stack, string communityName, string language, GameMode gameMode, int maxPlayers = DefaultMaxPlayers, int ascension = MatchTags.AscensionAny, bool openMatchingWindowOnHost = false)
+    public static async Task<HostResult> StartFreshHostAsync(NSubmenuStack stack, string communityName, string language, MatchMode gameMode, int maxPlayers = DefaultMaxPlayers, int ascension = MatchTags.AscensionAny, bool openMatchingWindowOnHost = false)
     {
         // Daily's own StartRunLobby setup hardcodes a 4-player lobby internally regardless of what the Steam-level
         // cap was, so a smaller custom count here would be misleading - keep vanilla's fixed 4 for Daily.
-        int effectiveMaxPlayers = gameMode == GameMode.Daily ? DefaultMaxPlayers : maxPlayers;
+        int effectiveMaxPlayers = gameMode == MatchMode.Daily ? DefaultMaxPlayers : maxPlayers;
 
         // We're the only member at creation time, so the room can reach exactly our own unlocked ceiling; once the
         // run screen exists, RecruitToggleInjector re-tags from StartRunLobby.MaxAscension on every roster change.
-        int initialAscension = MatchLobbyTagging.ResolveRoomAscension(MatchTags.LocalMaxAscension, ascension);
+        int initialAscension = MatchLobbyTagging.ResolveRoomAscension(MatchTags.LocalMaxAscension(gameMode), ascension);
 
         Log.Info($"[sts2_matchmaker] Starting fresh match host (mode={gameMode}, maxPlayers={effectiveMaxPlayers}, community='{communityName}', language='{language}', ascension={initialAscension})");
         (string? err, NetHostGameService? netService, CSteamID lobbyId) = await CreateAndTagLobbyAsync(communityName, language, gameMode, effectiveMaxPlayers, MatchTags.KindFresh, initialAscension);
@@ -59,7 +58,7 @@ public static class MatchHostService
         {
             switch (gameMode)
             {
-                case GameMode.Daily:
+                case MatchMode.Daily:
                 {
                     NDailyRunScreen screen = stack.GetSubmenuType<NDailyRunScreen>();
                     OpenMatchingWindowOnNextInject = openMatchingWindowOnHost;
@@ -67,12 +66,18 @@ public static class MatchHostService
                     stack.Push(screen);
                     break;
                 }
-                case GameMode.Custom:
+                case MatchMode.Custom:
                 {
                     NCustomRunScreen screen = stack.GetSubmenuType<NCustomRunScreen>();
                     OpenMatchingWindowOnNextInject = openMatchingWindowOnHost;
                     screen.InitializeMultiplayerAsHost(netService, effectiveMaxPlayers);
                     stack.Push(screen);
+                    break;
+                }
+                case MatchMode.Blitz:
+                {
+                    OpenMatchingWindowOnNextInject = openMatchingWindowOnHost;
+                    GameModeCompat.PushBlitzHostScreen(stack, netService, effectiveMaxPlayers);
                     break;
                 }
                 default:
@@ -100,7 +105,7 @@ public static class MatchHostService
     // fact (see Patches/VanillaRehostTagPatch.cs), instead of building a parallel custom-triggered flow that
     // duplicates vanilla's own load-screen navigation for every game mode.
 
-    private static async Task<(string? error, NetHostGameService? netService, CSteamID lobbyId)> CreateAndTagLobbyAsync(string communityName, string language, GameMode gameMode, int maxPlayers, string kind, int ascension)
+    private static async Task<(string? error, NetHostGameService? netService, CSteamID lobbyId)> CreateAndTagLobbyAsync(string communityName, string language, MatchMode gameMode, int maxPlayers, string kind, int ascension)
     {
         var netService = GameVersionCompat.CreateNetHostGameService();
         NetErrorInfo? err = await netService.StartSteamHost(maxPlayers);

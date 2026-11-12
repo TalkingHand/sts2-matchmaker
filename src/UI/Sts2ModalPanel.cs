@@ -35,7 +35,14 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
     // just its Image/Icon child texture swapped to this "X" variant (see reference/screens/CharacterSelect/
     // NCharacterSelectScreen.cs and the "UnreadyButton" node override in character_select_screen.tscn) - same scene,
     // same slide-in/out-from-the-left positioning, same script (NBackButton), different icon.
-    private const string CancelIconTexturePath = "res://images/atlases/compressed.sprites/back_button_x.tres";
+    // v0.113.0 renamed the atlas folder (compressed.sprites -> compressed_atlas.sprites); a missing path makes the
+    // game fall back to its "NOPE" placeholder texture, so try the current location first and keep the old one for
+    // builds that haven't moved yet.
+    private static readonly string[] CancelIconTexturePaths =
+    {
+        "res://images/atlases/compressed_atlas.sprites/back_button_x.tres",
+        "res://images/atlases/compressed.sprites/back_button_x.tres",
+    };
     private const string PopupYesButtonScenePath = "res://scenes/ui/abandon_run_yes_button.tscn";
     private const string BodyFontPath = "res://themes/kreon_regular_shared.tres";
     private const string PillButtonTexturePath = "res://images/ui/reward_screen/reward_item_button.png";
@@ -588,7 +595,7 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
 
     /// <summary>
     /// Same bottom-left back_button.tscn slot as AddCloseButton, but with the icon swapped to the "X"/cancel
-    /// variant the game itself uses for exactly this purpose (see the CancelIconTexturePath doc above) - meant to
+    /// variant the game itself uses for exactly this purpose (see the CancelIconTexturePaths doc above) - meant to
     /// stand in for AddCloseButton's NBackButton while some in-progress action (that the close button can't safely
     /// interrupt) is running, e.g. NCharacterSelectScreen's UnreadyButton standing in for BackButton while waiting
     /// on other players. Starts disabled/off-screen (unlike AddCloseButton, which enables itself immediately) -
@@ -605,7 +612,8 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
                 throw new InvalidOperationException($"GetScene returned null for {BackButtonScenePath}");
             }
             var cancelButton = scene.Instantiate<NBackButton>(PackedScene.GenEditState.Disabled);
-            Texture2D? xIcon = GD.Load<Texture2D>(CancelIconTexturePath);
+            string? xIconPath = System.Array.Find(CancelIconTexturePaths, path => ResourceLoader.Exists(path));
+            Texture2D? xIcon = xIconPath == null ? null : GD.Load<Texture2D>(xIconPath);
             if (xIcon != null)
             {
                 cancelButton.GetNode<TextureRect>("Image/Icon").Texture = xIcon;

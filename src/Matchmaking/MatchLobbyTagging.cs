@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using MegaCrit.Sts2.Core.Runs;
 using Steamworks;
 
 namespace Sts2Matchmaker.Matchmaking;
@@ -11,7 +10,7 @@ namespace Sts2Matchmaker.Matchmaking;
 /// </summary>
 public static class MatchLobbyTagging
 {
-    public static void ApplyTags(CSteamID lobbyId, string communityName, string language, GameMode gameMode, int maxPlayers, string kind, int ascension)
+    public static void ApplyTags(CSteamID lobbyId, string communityName, string language, MatchMode gameMode, int maxPlayers, string kind, int ascension)
     {
         // Vanilla/default hosting creates a FriendsOnly lobby (invisible to RequestLobbyList search).
         SteamMatchmaking.SetLobbyType(lobbyId, ELobbyType.k_ELobbyTypePublic);
@@ -28,6 +27,7 @@ public static class MatchLobbyTagging
         SteamMatchmaking.SetLobbyData(lobbyId, MatchTags.MaxPlayersKey, maxPlayers.ToString());
         SteamMatchmaking.SetLobbyData(lobbyId, MatchTags.KindKey, kind);
         SteamMatchmaking.SetLobbyData(lobbyId, MatchTags.AscensionKey, ascension.ToString());
+        MegaCrit.Sts2.Core.Logging.Log.Info($"[sts2_matchmaker] Tagged lobby {lobbyId.m_SteamID} (kind={kind}, mode={gameMode}, maxPlayers={maxPlayers}, ascension={ascension})");
     }
 
     /// <summary>

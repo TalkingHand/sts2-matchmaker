@@ -69,12 +69,25 @@ public static class NMultiplayerSubmenuPatch
 
         try
         {
-            TextureRect? icon = button.GetNodeOrNull<TextureRect>("Icon");
             Texture2D? iconTexture = GetIconTexture();
-            if (icon != null && iconTexture != null)
+            // v0.113.0 replaced the button's plain "Icon" TextureRect with an NSubmenuPortrait (still a TextureRect,
+            // reached via unique name %SubmenuPortrait, with its own Frame/Lock children drawn on top). Missing it
+            // left the scene's default portrait art in place instead of our image.
+            TextureRect? legacyIcon = button.GetNodeOrNull<TextureRect>("Icon");
+            TextureRect? portrait = legacyIcon == null ? button.GetNodeOrNull<TextureRect>("%SubmenuPortrait") : null;
+            if (iconTexture != null && legacyIcon != null)
             {
-                icon.Texture = iconTexture;
-                ApplyHoverOverlay(button, icon);
+                legacyIcon.Texture = iconTexture;
+                ApplyHoverOverlay(button, legacyIcon);
+            }
+            else if (iconTexture != null && portrait != null)
+            {
+                portrait.Texture = iconTexture;
+                ApplyPortraitHoverOverlay(button, portrait);
+            }
+            else
+            {
+                Log.Warn("[sts2_matchmaker] Matching button has neither an Icon nor a %SubmenuPortrait node - icon not replaced");
             }
 
             button.GetNodeOrNull<MegaLabel>("%Title")?.SetTextAutoSize(Loc.Get("매칭"));
@@ -113,6 +126,40 @@ public static class NMultiplayerSubmenuPatch
         overlay.Modulate = new Color(1f, 1f, 1f, 0f);
         button.AddChild(overlay);
         button.MoveChild(overlay, icon.GetIndex() + 1);
+
+        button.Connect(NClickableControl.SignalName.Focused, Callable.From<NClickableControl>(_ =>
+        {
+            if (GodotObject.IsInstanceValid(overlay))
+            {
+                overlay.Modulate = new Color(1f, 1f, 1f, 0.18f);
+            }
+        }));
+        button.Connect(NClickableControl.SignalName.Unfocused, Callable.From<NClickableControl>(_ =>
+        {
+            if (GodotObject.IsInstanceValid(overlay))
+            {
+                overlay.Modulate = new Color(1f, 1f, 1f, 0f);
+            }
+        }));
+    }
+
+    /// <summary>Same brighten-on-focus overlay as ApplyHoverOverlay, for the NSubmenuPortrait layout. Not a
+    /// Duplicate() of the portrait (that would copy its script and Frame/Lock children too) - a plain TextureRect
+    /// added as the portrait's FIRST child, so it draws over the image but still under the frame.</summary>
+    private static void ApplyPortraitHoverOverlay(NButton button, TextureRect portrait)
+    {
+        var overlay = new TextureRect
+        {
+            Name = "Sts2MatchmakerHoverOverlay",
+            Texture = portrait.Texture,
+            ExpandMode = portrait.ExpandMode,
+            StretchMode = portrait.StretchMode,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Modulate = new Color(1f, 1f, 1f, 0f),
+        };
+        overlay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        portrait.AddChild(overlay);
+        portrait.MoveChild(overlay, 0);
 
         button.Connect(NClickableControl.SignalName.Focused, Callable.From<NClickableControl>(_ =>
         {

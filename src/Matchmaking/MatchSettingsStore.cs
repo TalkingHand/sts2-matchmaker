@@ -1,6 +1,5 @@
 using Godot;
 using MegaCrit.Sts2.Core.Logging;
-using MegaCrit.Sts2.Core.Runs;
 
 namespace Sts2Matchmaker.Matchmaking;
 
@@ -28,7 +27,7 @@ public static class MatchSettingsStore
         settings.MaxPlayers = (int)config.GetValue(Section, "max_players", settings.MaxPlayers);
         settings.RequireModMatch = (bool)config.GetValue(Section, "require_mod_match", settings.RequireModMatch);
         settings.CanHost = (bool)config.GetValue(Section, "can_host", settings.CanHost);
-        settings.GameMode = (GameMode)(int)config.GetValue(Section, "game_mode", (int)settings.GameMode);
+        settings.GameMode = (MatchMode)(int)config.GetValue(Section, "game_mode", (int)settings.GameMode);
         // Ascension is deliberately NOT persisted here - see MatchSettings.Ascension's own doc.
         return settings;
     }

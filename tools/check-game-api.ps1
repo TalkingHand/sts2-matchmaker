@@ -47,7 +47,10 @@ $WatchedTypes = @(
     "MegaCrit.Sts2.Core.Multiplayer.Game.Lobby.LoadRunLobby",
     "MegaCrit.Sts2.Core.Multiplayer.NetHostGameService",
     "MegaCrit.Sts2.Core.Multiplayer.PeerVersionInfo",
-    "MegaCrit.Sts2.Core.Nodes.Multiplayer.NRemoteLobbyPlayerContainer"
+    "MegaCrit.Sts2.Core.Nodes.Multiplayer.NRemoteLobbyPlayerContainer",
+    "MegaCrit.Sts2.Core.Runs.GameMode",                              # enum reshuffled in v0.113.0 (see GameModeCompat)
+    "MegaCrit.Sts2.Core.Nodes.Screens.Blitz.NBlitzScreen",           # v0.113.0+ only
+    "MegaCrit.Sts2.Core.Nodes.Screens.MainMenu.NMultiplayerHostSubmenu"
 )
 
 if (-not (Test-Path $DllPath)) {

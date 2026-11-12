@@ -47,7 +47,7 @@ public static class MatchTags
     /// multiplayer run at your current max (ProgressSaveManager.IncrementMultiplayerAscension), so most players sit
     /// at 0 and no two players are likely to share the same ceiling.
     /// </summary>
-    public static int LocalMaxAscension => SaveManager.Instance.Progress.MaxMultiplayerAscension;
+    public static int LocalMaxAscension(MatchMode mode) => GameModeCompat.LocalMaxAscension(mode);
 
     /// <summary>
     /// Union of every current lobby member's personal ban list (SteamID64s, pipe-separated). Any member can update

@@ -1,4 +1,3 @@
-using MegaCrit.Sts2.Core.Runs;
 
 namespace Sts2Matchmaker.Matchmaking;
 
@@ -24,7 +23,7 @@ public sealed class MatchSettings
     public int MaxPlayers = MatchHostService.MaxPlayers;
     public bool RequireModMatch = true;
     public bool CanHost = true;
-    public GameMode GameMode = GameMode.Standard;
+    public MatchMode GameMode = MatchMode.Standard;
 
     /// <summary>
     /// Exact ascension level to match on, or MatchTags.AscensionAny for "don't care". Not persisted via

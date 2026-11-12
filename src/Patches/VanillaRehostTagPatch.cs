@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect;
 using MegaCrit.Sts2.Core.Nodes.Screens.CustomRun;
 using MegaCrit.Sts2.Core.Nodes.Screens.DailyRun;
 using MegaCrit.Sts2.Core.Saves;
+using Sts2Matchmaker.Helpers;
 using Sts2Matchmaker.Matchmaking;
 using Steamworks;
 
@@ -54,7 +55,7 @@ internal static class VanillaRehostTagShared
 
             var lobbyId = new CSteamID(lobbyIdValue);
             string language = LocManager.Instance?.Language ?? string.Empty;
-            MatchLobbyTagging.ApplyTags(lobbyId, string.Empty, language, run.GameMode, MatchHostService.DefaultMaxPlayers, MatchTags.KindRehost, run.Ascension);
+            MatchLobbyTagging.ApplyTags(lobbyId, string.Empty, language, GameModeCompat.FromRun(run), MatchHostService.DefaultMaxPlayers, MatchTags.KindRehost, run.Ascension);
             MatchLobbyTagging.SetRehostParticipants(lobbyId, run.Players.Select(p => p.NetId));
             _ = BanTagSync.MergeMyBansIntoLobbyAsync(lobbyId);
             s_pendingRehostLobbyId = lobbyId;

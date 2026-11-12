@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using MegaCrit.Sts2.Core.Localization;
-using MegaCrit.Sts2.Core.Runs;
+using Sts2Matchmaker.Helpers;
 using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 
@@ -60,9 +60,12 @@ public class MatchConditionsPanel : VBoxContainer
     private VBoxContainer? _communitySuggestionList;
     private Control? _communitySuggestionDismisser;
     private NativeDropdownField<string> _languageField = null!;
-    private NativeDropdownField<GameMode>? _gameModeField;
+    private NativeDropdownField<MatchMode>? _gameModeField;
     private NativeDropdownField<int>? _maxPlayersField;
     private NativeDropdownField<int>? _ascensionField;
+    private VBoxContainer _ascensionSlot = null!;
+    private int _ascensionRowCeiling;
+    private readonly MatchMode _fixedGameMode;
 
     public bool ShowGameMode { get; }
     public bool ShowMaxPlayers { get; }
@@ -80,8 +83,11 @@ public class MatchConditionsPanel : VBoxContainer
     /// MatchmakingWindow/MatchConditionsWindow), which sits OUTSIDE the ScrollContainer both of those wrap their
     /// row content in - without it, a long open list (승천 단계's up to 12 options, this panel's own tallest) can
     /// get silently clipped by that ScrollContainer partway through, with no way to reach the rest.</param>
-    public MatchConditionsPanel(bool showGameMode, bool showMaxPlayers, int currentLobbyPlayerCount = 0, Control? overlayParent = null)
+    /// <param name="fixedGameMode">The room's own mode when ShowGameMode is false (MatchConditionsWindow, an
+    /// already-open room) - only used to pick the right ascension ceiling (Blitz has its own). Ignored otherwise.</param>
+    public MatchConditionsPanel(bool showGameMode, bool showMaxPlayers, int currentLobbyPlayerCount = 0, Control? overlayParent = null, MatchMode fixedGameMode = MatchMode.Standard)
     {
+        _fixedGameMode = fixedGameMode;
         ShowGameMode = showGameMode;
         ShowMaxPlayers = showMaxPlayers;
         _currentLobbyPlayerCount = currentLobbyPlayerCount;
@@ -153,21 +159,33 @@ public class MatchConditionsPanel : VBoxContainer
         // originally added in.
         if (ShowGameMode)
         {
-            var gameModeOptions = new List<(string Label, GameMode Value)>
+            var gameModeOptions = new List<(string Label, MatchMode Value)>
             {
-                (Loc.Get("스탠다드"), GameMode.Standard),
-                (Loc.Get("데일리"), GameMode.Daily),
-                (Loc.Get("커스텀"), GameMode.Custom),
+                (Loc.Get("스탠다드"), MatchMode.Standard),
+                (Loc.Get("데일리"), MatchMode.Daily),
             };
-            _gameModeField = NativeDropdownField<GameMode>.BuildOrFallback(gameModeOptions, GameMode.Standard, _ =>
+            // Same order as vanilla's own host menu (일반/일일/블리츠/커스텀). Only offered once this player has
+            // Blitz unlocked - see GameModeCompat.IsBlitzAvailable for why a locked player can't use it anyway.
+            if (GameModeCompat.IsBlitzAvailable())
+            {
+                gameModeOptions.Add((Loc.Get("블리츠"), MatchMode.Blitz));
+            }
+            gameModeOptions.Add((Loc.Get("커스텀"), MatchMode.Custom));
+            _gameModeField = NativeDropdownField<MatchMode>.BuildOrFallback(gameModeOptions, MatchMode.Standard, _ =>
             {
                 UpdateMaxPlayersEnabled();
+                RebuildAscensionRowIfCeilingChanged();
                 SettingsChanged?.Invoke();
             }, _overlayParent);
             AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("런 종류"), _gameModeField.Control));
             AddChild(Sts2ModalPanel.BuildSettingsDivider());
         }
 
+        // A slot rather than adding the rows straight to this panel, so the ascension row can be rebuilt in place
+        // when 런 종류 switches to/from Blitz (its own separate ascension ceiling) without disturbing row order.
+        _ascensionSlot = new VBoxContainer();
+        _ascensionSlot.AddThemeConstantOverride("separation", GetThemeConstant("separation"));
+        AddChild(_ascensionSlot);
         BuildAscensionRow();
 
         if (ShowMaxPlayers)
@@ -374,7 +392,9 @@ public class MatchConditionsPanel : VBoxContainer
     /// </summary>
     private void BuildAscensionRow()
     {
-        int maxAscension = MatchTags.LocalMaxAscension;
+        int maxAscension = MatchTags.LocalMaxAscension(CurrentGameMode);
+        _ascensionRowCeiling = maxAscension;
+        _ascensionSlot.Visible = maxAscension > 0;
         if (maxAscension <= 0)
         {
             return;
@@ -387,9 +407,29 @@ public class MatchConditionsPanel : VBoxContainer
         }
         ascensionOptions.Add((Loc.Get("무관"), MatchTags.AscensionAny));
         _ascensionField = NativeDropdownField<int>.BuildOrFallback(ascensionOptions, maxAscension, overlayParent: _overlayParent);
-        AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("승천 단계"), _ascensionField.Control));
-        AddChild(Sts2ModalPanel.BuildSettingsDivider());
+        _ascensionSlot.AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("승천 단계"), _ascensionField.Control));
+        _ascensionSlot.AddChild(Sts2ModalPanel.BuildSettingsDivider());
     }
+
+    /// <summary>Blitz keeps its own ascension ceiling (Progress.MaxBlitzAscension), so switching 런 종류 to/from it
+    /// can change which levels are real choices - rebuild the row (back to the new ceiling as its default, same as
+    /// a fresh open) only when the ceiling actually differs.</summary>
+    private void RebuildAscensionRowIfCeilingChanged()
+    {
+        if (MatchTags.LocalMaxAscension(CurrentGameMode) == _ascensionRowCeiling)
+        {
+            return;
+        }
+        foreach (Node child in _ascensionSlot.GetChildren())
+        {
+            _ascensionSlot.RemoveChild(child);
+            child.QueueFree();
+        }
+        _ascensionField = null;
+        BuildAscensionRow();
+    }
+
+    private MatchMode CurrentGameMode => _gameModeField?.Value ?? _fixedGameMode;
 
     private void UpdateMaxPlayersEnabled()
     {
@@ -398,7 +438,7 @@ public class MatchConditionsPanel : VBoxContainer
             return;
         }
         // Daily hosting always forces 4 players internally (see MatchHostService) - the selector would be misleading.
-        bool isDaily = _gameModeField.Value == GameMode.Daily;
+        bool isDaily = _gameModeField.Value == MatchMode.Daily;
         _maxPlayersField.Disabled = isDaily;
     }
 
@@ -414,7 +454,7 @@ public class MatchConditionsPanel : VBoxContainer
     /// reads it (tagging, search filters) is untouched.</summary>
     public bool RequireModMatch => true;
 
-    public GameMode SelectedGameMode => _gameModeField?.Value ?? GameMode.Standard;
+    public MatchMode SelectedGameMode => _gameModeField?.Value ?? MatchMode.Standard;
     public int SelectedMaxPlayers => _maxPlayersField?.Value ?? MatchHostService.DefaultMaxPlayers;
 
     /// <summary>Does NOT call RecentCommunityStore.Record - that's the debounce timer's job (and the suggestion-
@@ -453,6 +493,7 @@ public class MatchConditionsPanel : VBoxContainer
         if (_gameModeField != null)
         {
             _gameModeField.SetValue(settings.GameMode);
+            RebuildAscensionRowIfCeilingChanged();
         }
         if (_maxPlayersField != null)
         {
