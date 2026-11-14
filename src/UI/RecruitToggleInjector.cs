@@ -36,6 +36,35 @@ namespace Sts2Matchmaker.UI;
 /// </summary>
 public static class RecruitToggleInjector
 {
+    private const string BaseOffsetBottomMeta = "sts2mm_base_offset_bottom";
+
+    /// <summary>
+    /// The player list is a vertical FlowContainer with a fixed height (354px on the Standard/Blitz screens), sized
+    /// by the game for 4 cards + the Invite button. Our matching row adds one more 50px line, which pushed the last
+    /// items (Invite, then this row) into a second column once all 4 players were in. Grow the list by exactly that
+    /// one line instead - the space below it on those screens is only the info panel's empty left margin, which
+    /// these 200px-wide buttons fit inside.
+    ///
+    /// Idempotent per container (the original bottom is remembered in node metadata), since this runs again every
+    /// time the screen is re-initialized as host. Skipped when the list sits inside a Godot Container (the Daily
+    /// screen lays it out via custom_minimum_size in an HBox), where offsets are ignored and growing it would
+    /// re-flow the whole row it sits in.
+    /// </summary>
+    private static void MakeRoomForMatchingRow(Control remoteContainer, Control flowContainer, Control row)
+    {
+        if (remoteContainer.GetParent() is Container)
+        {
+            return;
+        }
+        if (!remoteContainer.HasMeta(BaseOffsetBottomMeta))
+        {
+            remoteContainer.SetMeta(BaseOffsetBottomMeta, remoteContainer.OffsetBottom);
+        }
+        float baseBottom = remoteContainer.GetMeta(BaseOffsetBottomMeta).AsSingle();
+        float extra = row.CustomMinimumSize.Y + flowContainer.GetThemeConstant("v_separation");
+        remoteContainer.OffsetBottom = baseBottom + extra;
+    }
+
     public static void Inject(Node screenNode, StartRunLobby lobby)
     {
         try
@@ -196,6 +225,10 @@ public static class RecruitToggleInjector
             if (flowContainer != null)
             {
                 flowContainer.AddChild(wrapper);
+                if (remoteContainer != null)
+                {
+                    MakeRoomForMatchingRow(remoteContainer, flowContainer, wrapper);
+                }
 
                 void KeepLastNow()
                 {

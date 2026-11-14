@@ -28,6 +28,46 @@ namespace Sts2Matchmaker.Patches;
 [HarmonyPatch(typeof(NRemoteLobbyPlayerContainer), "OnPlayerConnected")]
 public static class RemoteLobbyPlayerKickPatch
 {
+    /// <summary>Just past the card's own 192px width (see the positioning comment in Postfix).</summary>
+    private const float MinRowLeft = 200f;
+    private const float NameplateGap = 10f;
+
+    /// <summary>
+    /// The card is 192 wide, but its nameplate isn't clipped to that: remote_lobby_player.tscn gives NameplateLabel
+    /// a 354px-wide box starting at x=75 (NameplateContainer 75..242 plus offset_right 187), so a long Steam name
+    /// runs well past x=200 and a fixed-position button row sits right on top of it. Shift the row to wherever the
+    /// name's text actually ends instead - measured from the label's own font, and re-checked on every redraw of
+    /// the label so a name that's filled in or changed later still pushes the row out of the way.
+    /// </summary>
+    private static void KeepClearOfNameplate(Control card, Control moderationRow)
+    {
+        Label? nameplate = card.GetNodeOrNull<Label>("%NameplateLabel") ?? card.GetNodeOrNull<Label>("NameplateContainer/NameplateLabel");
+        if (nameplate == null)
+        {
+            return;
+        }
+
+        void Reposition()
+        {
+            if (!GodotObject.IsInstanceValid(nameplate) || !GodotObject.IsInstanceValid(moderationRow))
+            {
+                return;
+            }
+            Font font = nameplate.GetThemeFont("font");
+            int fontSize = nameplate.GetThemeFontSize("font_size");
+            float textWidth = font.GetStringSize(nameplate.Text, HorizontalAlignment.Left, -1f, fontSize).X;
+            float textEnd = nameplate.GetGlobalRect().Position.X - card.GetGlobalRect().Position.X + textWidth;
+            float left = Mathf.Max(MinRowLeft, Mathf.Ceil(textEnd + NameplateGap));
+            if (!Mathf.IsEqualApprox(moderationRow.OffsetLeft, left))
+            {
+                moderationRow.OffsetLeft = left;
+            }
+        }
+
+        Reposition();
+        nameplate.Draw += Reposition;
+    }
+
     [HarmonyPostfix]
     public static void Postfix(NRemoteLobbyPlayerContainer __instance, object player)
     {
@@ -76,9 +116,10 @@ public static class RemoteLobbyPlayerKickPatch
             // ((68-50)/2 = 9). No fixed OffsetRight/Bottom (unlike the old fixed-3-icon-width version) - these are
             // now BuildTextActionButton, which auto-sizes to its own text, so the HBoxContainer sizes itself to
             // whatever its 1-2 children actually need instead of a width we'd have to keep in sync by hand.
-            moderationRow.OffsetLeft = 200f;
+            moderationRow.OffsetLeft = MinRowLeft;
             moderationRow.OffsetTop = 9f;
             row.AddChild(moderationRow);
+            KeepClearOfNameplate(row, moderationRow);
 
             // Explicit hex red instead of a hue/sat/value shader approximation - the approximated hue=0.6 (a
             // reasonable "measured red" against the pill texture) rendered too pink/magenta once actually seen
