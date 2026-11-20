@@ -1039,6 +1039,22 @@
     "tha": "บลิทซ์",
     "tur": "Blitz"
   },
+  "드레드": {
+    "eng": "Dread",
+    "zhs": "恐惧",
+    "zht": "恐懼",
+    "deu": "Grauen",
+    "esp": "Pavor",
+    "fra": "Effroi",
+    "ita": "Terrore",
+    "jpn": "ドレッド",
+    "pol": "Groza",
+    "ptb": "Pavor",
+    "rus": "Ужас",
+    "spa": "Pavor",
+    "tha": "เดรด",
+    "tur": "Dehşet"
+  },
   "킥": {
     "eng": "Kick",
     "zhs": "踢出",

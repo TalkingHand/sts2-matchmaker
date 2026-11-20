@@ -721,6 +721,14 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
     }
 
     /// <summary>
+    /// Closes this panel because the game is about to navigate somewhere else on its own (a Steam invite/"join
+    /// game" accepted while this was open - see SteamInviteJoinClosePatch). Unlike OnCloseRequested, this must
+    /// always close, even mid-operation: the vanilla join pops the whole submenu stack underneath us regardless.
+    /// Default just runs the normal close path; subclasses whose OnCloseRequested can refuse to close override it.
+    /// </summary>
+    internal virtual void ForceCloseForExternalJoin() => OnCloseRequested();
+
+    /// <summary>
     /// Reuses the game's own bottom-right checkmark "confirm" button (scenes/ui/confirm_button.tscn -> NConfirmButton
     /// - see reference/ui/confirm_button.tscn and reference/CommonUi/NConfirmButton.cs) instead of a plain text
     /// button, for an action that reads as "confirm this choice" rather than a labeled command. Same positioning

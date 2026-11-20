@@ -80,6 +80,12 @@ public static class MatchHostService
                     GameModeCompat.PushBlitzHostScreen(stack, netService, effectiveMaxPlayers);
                     break;
                 }
+                case MatchMode.Dread:
+                {
+                    OpenMatchingWindowOnNextInject = openMatchingWindowOnHost;
+                    GameModeCompat.PushDreadHostScreen(stack, netService, effectiveMaxPlayers);
+                    break;
+                }
                 default:
                 {
                     NCharacterSelectScreen screen = stack.GetSubmenuType<NCharacterSelectScreen>();

@@ -258,6 +258,15 @@ public class MatchConditionsWindow : Sts2ModalPanel
         base.OnCloseRequested();
     }
 
+    /// <summary>Skips OnCloseRequested's "stay open while open-to-matching" guard: the vanilla invite join is about
+    /// to pop this lobby's screen (and leave the Steam lobby) anyway, so there's no search left to protect.</summary>
+    internal override void ForceCloseForExternalJoin()
+    {
+        _conditions.RecordCommunityIfNotEmpty();
+        SaveCurrentSettings();
+        NModalContainer.Instance?.Clear();
+    }
+
     /// <summary>Static + explicit lobby/label params (not instance state) so it reads standalone at the call site
     /// above, same reasoning as SaveCurrentSettings/OnTogglePressed already use _lobby directly for. label is
     /// BuildSettingsActionButton's own plain Label out-param, not BuildTextActionButton's - swapped directly rather

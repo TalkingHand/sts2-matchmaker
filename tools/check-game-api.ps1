@@ -50,6 +50,8 @@ $WatchedTypes = @(
     "MegaCrit.Sts2.Core.Nodes.Multiplayer.NRemoteLobbyPlayerContainer",
     "MegaCrit.Sts2.Core.Runs.GameMode",                              # enum reshuffled in v0.113.0 (see GameModeCompat)
     "MegaCrit.Sts2.Core.Nodes.Screens.Blitz.NBlitzScreen",           # v0.113.0+ only
+    "MegaCrit.Sts2.Core.Nodes.Screens.Dread.NDreadScreen",           # v0.113.0+ only
+    "MegaCrit.Sts2.Core.Platform.Steam.SteamJoinCallbackHandler",    # JoinToHost patched by name (SteamInviteJoinClosePatch)
     "MegaCrit.Sts2.Core.Nodes.Screens.MainMenu.NMultiplayerHostSubmenu"
 )
 

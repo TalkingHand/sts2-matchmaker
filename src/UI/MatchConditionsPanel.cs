@@ -170,6 +170,11 @@ public class MatchConditionsPanel : VBoxContainer
             {
                 gameModeOptions.Add((Loc.Get("블리츠"), MatchMode.Blitz));
             }
+            // Vanilla's host menu puts 드레드 right after 블리츠; same unlock gating (DreadEpoch).
+            if (GameModeCompat.IsDreadAvailable())
+            {
+                gameModeOptions.Add((GameModeCompat.DreadDisplayName(), MatchMode.Dread));
+            }
             gameModeOptions.Add((Loc.Get("커스텀"), MatchMode.Custom));
             _gameModeField = NativeDropdownField<MatchMode>.BuildOrFallback(gameModeOptions, MatchMode.Standard, _ =>
             {

@@ -48,3 +48,36 @@ public static class BlitzRunHostIdCapturePatch
     [HarmonyPostfix]
     public static void Postfix(INetGameService gameService) => KickBanPromptShared.RememberHostId(gameService);
 }
+
+/// <summary>Dread-mode (NDreadScreen, v0.113.0+) counterparts of the Blitz patches above - same
+/// InitializeMultiplayerAsHost/AsClient + public Lobby shape, same by-name resolution for older builds. NDreadScreen
+/// also has the same %RemotePlayerContainer the recruit row and per-player moderation buttons attach to.</summary>
+[HarmonyPatch]
+public static class DreadRunRecruitPatch
+{
+    public static bool Prepare() => GameModeCompat.DreadScreenType != null;
+
+    public static MethodBase TargetMethod() => AccessTools.Method(GameModeCompat.DreadScreenType, "InitializeMultiplayerAsHost");
+
+    [HarmonyPostfix]
+    public static void Postfix(object __instance)
+    {
+        StartRunLobby? lobby = Traverse.Create(__instance).Property("Lobby").GetValue<StartRunLobby>();
+        if (lobby == null)
+        {
+            return;
+        }
+        RecruitToggleInjector.Inject((Node)__instance, lobby);
+    }
+}
+
+[HarmonyPatch]
+public static class DreadRunHostIdCapturePatch
+{
+    public static bool Prepare() => GameModeCompat.DreadScreenType != null;
+
+    public static MethodBase TargetMethod() => AccessTools.Method(GameModeCompat.DreadScreenType, "InitializeMultiplayerAsClient");
+
+    [HarmonyPostfix]
+    public static void Postfix(INetGameService gameService) => KickBanPromptShared.RememberHostId(gameService);
+}

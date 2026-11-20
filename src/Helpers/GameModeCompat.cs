@@ -1,8 +1,11 @@
 using System;
 using System.Reflection;
+using System.Text.RegularExpressions;
+using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Multiplayer.Game.Lobby;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
 using MegaCrit.Sts2.Core.Saves;
+using Sts2Matchmaker.Localization;
 using Sts2Matchmaker.Matchmaking;
 
 namespace Sts2Matchmaker.Helpers;
@@ -17,8 +20,8 @@ namespace Sts2Matchmaker.Helpers;
 /// NAME is stable per mode, so it's classified by ToString() here, and the custom flag is read by reflection since
 /// older builds don't have it at all.
 ///
-/// Blitz only exists on the new build, so its screen type, unlock epoch and ascension progress are likewise looked
-/// up by name - this class's metadata must stay loadable on a build without any of them.
+/// Blitz and Dread only exist on the new build, so their screen types, unlock epochs and Blitz's ascension progress
+/// are likewise looked up by name - this class's metadata must stay loadable on a build without any of them.
 /// </summary>
 public static class GameModeCompat
 {
@@ -29,6 +32,9 @@ public static class GameModeCompat
 
     public static readonly Type? BlitzScreenType = GameAssembly.GetType("MegaCrit.Sts2.Core.Nodes.Screens.Blitz.NBlitzScreen");
     private static readonly Type? BlitzEpochType = GameAssembly.GetType("MegaCrit.Sts2.Core.Timeline.Epochs.BlitzEpoch");
+
+    public static readonly Type? DreadScreenType = GameAssembly.GetType("MegaCrit.Sts2.Core.Nodes.Screens.Dread.NDreadScreen");
+    private static readonly Type? DreadEpochType = GameAssembly.GetType("MegaCrit.Sts2.Core.Timeline.Epochs.DreadEpoch");
 
     public static MatchMode FromLobby(StartRunLobby lobby)
     {
@@ -62,9 +68,16 @@ public static class GameModeCompat
     /// own NMultiplayerHostSubmenu uses to enable its 블리츠 button (SaveManager.IsEpochRevealed&lt;BlitzEpoch&gt;).
     /// A host's StartRunLobby also rejects a joining player without that epoch, so offering Blitz matching to
     /// someone who hasn't unlocked it would only produce failed joins.</summary>
-    public static bool IsBlitzAvailable()
+    public static bool IsBlitzAvailable() => IsModeAvailable(BlitzScreenType, BlitzEpochType);
+
+    /// <summary>Same as IsBlitzAvailable, for Dread - vanilla's NMultiplayerHostSubmenu gates its 드레드 button on
+    /// SaveManager.IsEpochRevealed&lt;DreadEpoch&gt;, and StartRunLobby disconnects a joining player without that
+    /// epoch (NetError.DreadNotUnlocked).</summary>
+    public static bool IsDreadAvailable() => IsModeAvailable(DreadScreenType, DreadEpochType);
+
+    private static bool IsModeAvailable(Type? screenType, Type? epochType)
     {
-        if (BlitzScreenType == null || BlitzEpochType == null)
+        if (screenType == null || epochType == null)
         {
             return false;
         }
@@ -72,12 +85,33 @@ public static class GameModeCompat
         {
             MethodInfo? isRevealed = Array.Find(typeof(SaveManager).GetMethods(BindingFlags.Public | BindingFlags.Instance),
                 m => m.Name == "IsEpochRevealed" && m.IsGenericMethodDefinition);
-            return isRevealed != null && (bool)isRevealed.MakeGenericMethod(BlitzEpochType).Invoke(SaveManager.Instance, null)!;
+            return isRevealed != null && (bool)isRevealed.MakeGenericMethod(epochType).Invoke(SaveManager.Instance, null)!;
         }
         catch (Exception)
         {
             return false;
         }
+    }
+
+    /// <summary>Dropdown label for Dread - the game's own host-menu button title (main_menu_ui DREAD_MP.title, what
+    /// NSubmenuButton.SetLocalization("DREAD_MP") shows) so the name matches vanilla in every language, falling back
+    /// to our own "드레드" entry if that key is ever missing. BBCode tags are stripped since the dropdown is plain
+    /// text.</summary>
+    public static string DreadDisplayName()
+    {
+        try
+        {
+            string? title = LocString.GetIfExists("main_menu_ui", "DREAD_MP.title")?.GetFormattedText();
+            if (!string.IsNullOrWhiteSpace(title))
+            {
+                return Regex.Replace(title, @"\[[^\]]*\]", string.Empty).Trim();
+            }
+        }
+        catch (Exception)
+        {
+            // fall through to our own string
+        }
+        return Loc.Get("드레드");
     }
 
     /// <summary>Highest ascension this player has unlocked for the given mode - Blitz tracks its own
@@ -96,15 +130,23 @@ public static class GameModeCompat
 
     /// <summary>NBlitzScreen fetched/initialized/pushed the same way vanilla's NMultiplayerHostSubmenu.StartHostAsync
     /// does for its Blitz case, but by reflection (the type doesn't exist on older builds).</summary>
-    public static void PushBlitzHostScreen(NSubmenuStack stack, object netService, int maxPlayers)
+    public static void PushBlitzHostScreen(NSubmenuStack stack, object netService, int maxPlayers) =>
+        PushHostScreen(BlitzScreenType, "Blitz", stack, netService, maxPlayers);
+
+    /// <summary>Dread counterpart of PushBlitzHostScreen - NDreadScreen has the same
+    /// InitializeMultiplayerAsHost(INetGameService, int) shape (vanilla's StartHostAsync Dread case).</summary>
+    public static void PushDreadHostScreen(NSubmenuStack stack, object netService, int maxPlayers) =>
+        PushHostScreen(DreadScreenType, "Dread", stack, netService, maxPlayers);
+
+    private static void PushHostScreen(Type? screenType, string modeName, NSubmenuStack stack, object netService, int maxPlayers)
     {
-        if (BlitzScreenType == null)
+        if (screenType == null)
         {
-            throw new InvalidOperationException("Blitz is not available on this game build");
+            throw new InvalidOperationException($"{modeName} is not available on this game build");
         }
-        NSubmenu screen = stack.GetSubmenuType(BlitzScreenType);
-        MethodInfo init = BlitzScreenType.GetMethod("InitializeMultiplayerAsHost")
-            ?? throw new MissingMethodException(BlitzScreenType.Name, "InitializeMultiplayerAsHost");
+        NSubmenu screen = stack.GetSubmenuType(screenType);
+        MethodInfo init = screenType.GetMethod("InitializeMultiplayerAsHost")
+            ?? throw new MissingMethodException(screenType.Name, "InitializeMultiplayerAsHost");
         init.Invoke(screen, new[] { netService, maxPlayers });
         stack.Push(screen);
     }

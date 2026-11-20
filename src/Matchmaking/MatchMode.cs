@@ -19,7 +19,8 @@ public enum MatchMode
     Custom = 3,
     Blitz = 4,
 
-    /// <summary>Not offered in the matching UI - only ever produced by GameModeCompat for a vanilla-hosted Dread
-    /// lobby/save (rehost tagging), so a Dread rehost stays findable by its own participants.</summary>
+    /// <summary>v0.113.0+ only, and offered in the matching UI only once DreadEpoch is unlocked (see
+    /// GameModeCompat.IsDreadAvailable). Also produced by GameModeCompat for a vanilla-hosted Dread lobby/save
+    /// (rehost tagging), so a Dread rehost stays findable by its own participants.</summary>
     Dread = 5,
 }
