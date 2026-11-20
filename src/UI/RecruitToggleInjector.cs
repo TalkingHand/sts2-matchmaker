@@ -139,6 +139,10 @@ public static class RecruitToggleInjector
                 {
                     return;
                 }
+                if (GameModeCompat.FromLobby(lobby) == MatchMode.Dread)
+                {
+                    return; // fixed A10 - ApplyTags already wrote Dread's one constant ascension tag
+                }
                 string? rawId = lobby.NetService.GetRawLobbyIdentifier();
                 if (rawId == null || !ulong.TryParse(rawId, out ulong idValue))
                 {

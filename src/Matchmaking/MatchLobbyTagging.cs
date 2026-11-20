@@ -12,6 +12,12 @@ public static class MatchLobbyTagging
 {
     public static void ApplyTags(CSteamID lobbyId, string communityName, string language, MatchMode gameMode, int maxPlayers, string kind, int ascension)
     {
+        // Dread is always A10 regardless of anyone's unlocks (see GameModeCompat.LocalMaxAscension) - one fixed
+        // tag value so StartRunLobby.MaxAscension's per-member minimum can't make Dread rooms look different.
+        if (gameMode == MatchMode.Dread)
+        {
+            ascension = 0;
+        }
         // Vanilla/default hosting creates a FriendsOnly lobby (invisible to RequestLobbyList search).
         SteamMatchmaking.SetLobbyType(lobbyId, ELobbyType.k_ELobbyTypePublic);
         SteamMatchmaking.SetLobbyData(lobbyId, MatchTags.ActiveKey, MatchTags.ActiveValue);

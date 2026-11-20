@@ -4,8 +4,12 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using HarmonyLib;
 using MegaCrit.Sts2.Core.Logging;
+using MegaCrit.Sts2.Core.Multiplayer.Game.Lobby;
+using MegaCrit.Sts2.Core.Nodes.Screens.DailyRun;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
+using Sts2Matchmaker.Helpers;
 using Steamworks;
 
 namespace Sts2Matchmaker.Matchmaking;
@@ -32,7 +36,7 @@ public static class GuestMatchService
         IEnumerable<GuestLobby> candidates = lobbies
             .Where(lobby => !lobby.IsRehost && MatchesFreshCriteria(lobby, settings))
             .OrderBy(ParseNo);
-        return await TryJoinCandidatesAsync(stack, candidates, cancelToken);
+        return await TryJoinCandidatesAsync(stack, candidates, settings.GameMode, cancelToken);
     }
 
     /// <summary>Rehost-wait entry point: only is_rehost posts, no other filtering - unlike this mod's own
@@ -44,10 +48,13 @@ public static class GuestMatchService
         IReadOnlyList<GuestLobby> lobbies = await GuestLobbyListClient.GetAsync(cancelToken);
         GuestDeadCandidateTracker.Prune(lobbies);
         IEnumerable<GuestLobby> candidates = lobbies.Where(lobby => lobby.IsRehost).OrderBy(ParseNo);
-        return await TryJoinCandidatesAsync(stack, candidates, cancelToken);
+        return await TryJoinCandidatesAsync(stack, candidates, expectedMode: null, cancelToken);
     }
 
-    private static async Task<CSteamID?> TryJoinCandidatesAsync(NSubmenuStack stack, IEnumerable<GuestLobby> sortedCandidates, CancellationToken cancelToken)
+    /// <param name="expectedMode">Fresh matching only: the run type the player asked for, re-checked against the
+    /// screen the join actually landed on (see JoinedModeMismatch). Null for rehost, whose load screen is shared
+    /// across modes and whose candidates are already the player's own save.</param>
+    private static async Task<CSteamID?> TryJoinCandidatesAsync(NSubmenuStack stack, IEnumerable<GuestLobby> sortedCandidates, MatchMode? expectedMode, CancellationToken cancelToken)
     {
         foreach (GuestLobby lobby in sortedCandidates)
         {
@@ -122,6 +129,13 @@ public static class GuestMatchService
             try
             {
                 await MatchJoinService.JoinLobbyAsync(stack, lobbyId, suppressErrorPopup: true);
+                if (expectedMode is { } wanted && JoinedMode(stack) is { } actual && actual != wanted)
+                {
+                    Log.Info($"[sts2_matchmaker] Guest candidate {lobbyIdValue} (no={lobby.No}) turned out to be {actual}, not {wanted} - leaving");
+                    GuestDeadCandidateTracker.MarkDead(lobby.No);
+                    LeaveJoinedLobby(stack);
+                    continue;
+                }
                 Log.Info($"[sts2_matchmaker] Guest-matched into lobby {lobbyIdValue} (DC no={lobby.No})");
                 return lobbyId;
             }
@@ -151,6 +165,48 @@ public static class GuestMatchService
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// The DC crawler can't tell Blitz/Dread posts apart from Standard ones (its game_mode is only
+    /// standard/custom/daily/expansion, and anything without a custom/daily keyword in the title is "standard"),
+    /// and vanilla lobbies carry no Steam lobby data at all - so the real run type is only knowable after joining,
+    /// from the screen NJoinFriendScreen pushed for it. Null when it can't be determined (accept the join then,
+    /// same as before this check existed).
+    /// </summary>
+    private static MatchMode? JoinedMode(NSubmenuStack stack)
+    {
+        object? top = stack.Peek();
+        if (top is NDailyRunScreen)
+        {
+            return MatchMode.Daily; // no public Lobby property on this screen
+        }
+        if (top == null)
+        {
+            return null;
+        }
+        try
+        {
+            StartRunLobby? lobby = Traverse.Create(top).Property("Lobby").GetValue<StartRunLobby>();
+            return lobby == null ? null : GameModeCompat.FromLobby(lobby);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Pops the run screen we just landed on - its OnSubmenuClosed runs vanilla's own
+    /// CleanUpLobby(disconnectSession: true), i.e. the same as pressing back - then the NJoinFriendScreen +
+    /// NMultiplayerSubmenu pair JoinGame pushed underneath it, the same way the join-failure path does.</summary>
+    private static void LeaveJoinedLobby(NSubmenuStack stack)
+    {
+        stack.Pop();
+        if (stack.Peek() is NJoinFriendScreen or NMultiplayerSubmenu)
+        {
+            stack.Pop();
+            stack.Pop();
+        }
     }
 
     private static bool MatchesFreshCriteria(GuestLobby lobby, MatchSettings settings)

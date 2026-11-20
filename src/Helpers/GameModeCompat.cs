@@ -119,6 +119,14 @@ public static class GameModeCompat
     /// the multiplayer one.</summary>
     public static int LocalMaxAscension(MatchMode mode)
     {
+        // Dread has no ascension choice at all - every Dread run is played at a fixed A10 (NDreadScreen's own
+        // const _ascension = 10; NAscensionPanel hides its arrows in Dread). Reporting 0 hides our ascension row
+        // for it, and every Dread room is tagged with the same 0 (see MatchLobbyTagging.ApplyTags), so matching
+        // never splits Dread players over a number the game ignores.
+        if (mode == MatchMode.Dread)
+        {
+            return 0;
+        }
         object progress = SaveManager.Instance.Progress;
         if (mode == MatchMode.Blitz)
         {
