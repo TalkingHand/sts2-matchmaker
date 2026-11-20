@@ -2,7 +2,7 @@
   "title": "Match Maker",
   "description": "A mod that improves multiplayer convenience and adds automatic matchmaking.\nMatch multiplayer lobbies based on community name / language / ascension / player count / installed mods, or use quick rehosting and kick/ban features.\n\nDoesn't affect gameplay, so you can freely play with people who don't have it installed.\n\nhttps://github.com/TalkingHand/sts2-matchmaker",
   "visibility": "public",
-  "changeNote": "Lobby player list fixes: the kick/ban buttons no longer cover long player names, and with all 4 players in the lobby the Invite and Matching buttons now stay in one column under the player cards instead of wrapping to a second column.",
+  "changeNote": "Added Dread to matchmaking (shown once Dread is unlocked), and fixed the matching window staying open (with its search still running) when you joined another lobby through a Steam invite while matching.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
