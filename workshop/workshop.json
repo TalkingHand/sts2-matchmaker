@@ -2,7 +2,7 @@
   "title": "Match Maker",
   "description": "A mod that improves multiplayer convenience and adds automatic matchmaking.\nMatch multiplayer lobbies based on community name / language / ascension / player count / installed mods, or use quick rehosting and kick/ban features.\n\nDoesn't affect gameplay, so you can freely play with people who don't have it installed.\n\nhttps://github.com/TalkingHand/sts2-matchmaker",
   "visibility": "public",
-  "changeNote": "Added Dread to matchmaking (shown once Dread is unlocked), and fixed the matching window staying open (with its search still running) when you joined another lobby through a Steam invite while matching.",
+  "changeNote": "Dread fixes: Dread is always played at Ascension 10, so the ascension option is hidden for it and Dread rooms no longer get split by ascension. Also, if a vanilla lobby joined through the automatic lobby list turns out to be a different run type than the one you searched for (e.g. a Blitz or Dread room when you wanted Standard), you now leave it and keep searching.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
