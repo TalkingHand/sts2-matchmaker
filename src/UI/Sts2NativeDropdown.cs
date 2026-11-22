@@ -105,6 +105,141 @@ internal static class Sts2NativeDropdown
     /// </summary>
     public static Handle? TryBuild(IReadOnlyList<string> options, string initialValue, Action<string> onSelected, Control? overlayParent = null)
     {
+        string startValue = options.Contains(initialValue) ? initialValue : (options.Count > 0 ? options[0] : string.Empty);
+        Core? core = null;
+        core = BuildCore(options, startValue, overlayParent, (index, _) =>
+        {
+            core!.SetDisplayValue(options[index]);
+            core.SetOpen(false);
+            onSelected(options[index]);
+        }, onReady: onSelected);
+        return core == null ? null : new Handle(core.Root, core.SetDisplayValue, core.SetDisabled);
+    }
+
+    /// <summary>Live controls for a dropdown built by TryBuildMulti - see that method's own doc.</summary>
+    public sealed class MultiHandle
+    {
+        public Control Control { get; }
+        private readonly Action<IReadOnlyList<bool>> _setChecked;
+
+        internal MultiHandle(Control control, Action<IReadOnlyList<bool>> setChecked)
+        {
+            Control = control;
+            _setChecked = setChecked;
+        }
+
+        /// <summary>Replaces every item's ticked state and the summary text - does NOT invoke onToggled (a restore,
+        /// e.g. MatchConditionsPanel.LoadFrom, not a user change). One entry per option, same order.</summary>
+        public void SetChecked(IReadOnlyList<bool> isChecked) => _setChecked(isChecked);
+    }
+
+    /// <summary>
+    /// Multi-select variant of TryBuild, on the same native scene: each item gets the settings-screen checkbox icon
+    /// on its left, and picking an item flips its tick instead of closing the list (closing is the Dismisser - a
+    /// click anywhere outside - same as TryBuild). The closed box shows the ticked labels: up to two joined with
+    /// ", ", more as "first +N" so it stays readable at the label's minimum auto-size.
+    ///
+    /// onToggled(index, newState) decides whether a flip is allowed (return false to keep the old state, e.g. to
+    /// stop the last ticked item being unticked) and runs the caller's own side effects - it's called before the
+    /// tick is applied, so the caller reads its own state, not this dropdown's. Returns null if the native scene
+    /// fails to load, so callers can fall back to plain checkboxes.
+    /// </summary>
+    public static MultiHandle? TryBuildMulti(IReadOnlyList<string> options, IReadOnlyList<bool> initialChecked, Func<int, bool, bool> onToggled, Control? overlayParent = null)
+    {
+        var isChecked = new bool[options.Count];
+        for (int i = 0; i < options.Count; i++)
+        {
+            isChecked[i] = i < initialChecked.Count && initialChecked[i];
+        }
+        var icons = new List<TextureRect>(options.Count);
+        Texture2D? tickedIcon = Sts2ModalPanel.LoadCheckboxTexture(ticked: true);
+        Texture2D? untickedIcon = Sts2ModalPanel.LoadCheckboxTexture(ticked: false);
+
+        string Summary()
+        {
+            var labels = new List<string>();
+            for (int i = 0; i < options.Count; i++)
+            {
+                if (isChecked[i])
+                {
+                    labels.Add(options[i]);
+                }
+            }
+            return labels.Count switch
+            {
+                0 => string.Empty,
+                <= 2 => string.Join(", ", labels),
+                _ => $"{labels[0]} +{labels.Count - 1}",
+            };
+        }
+
+        void RefreshIcons()
+        {
+            for (int i = 0; i < icons.Count; i++)
+            {
+                icons[i].Texture = isChecked[i] ? tickedIcon : untickedIcon;
+            }
+        }
+
+        Core? core = null;
+        core = BuildCore(options, Summary(), overlayParent, (index, _) =>
+        {
+            bool next = !isChecked[index];
+            if (!onToggled(index, next))
+            {
+                return;
+            }
+            isChecked[index] = next;
+            RefreshIcons();
+            core!.SetDisplayValue(Summary());
+        }, onReady: null, decorateItem: item =>
+        {
+            // 28px icon, 14px in from the item's left edge, vertically centered - the label stays centered across
+            // the whole item like every native dropdown item, so the icon just sits in the left margin.
+            var icon = new TextureRect
+            {
+                ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                MouseFilter = Control.MouseFilterEnum.Ignore,
+            };
+            icon.SetAnchorsPreset(Control.LayoutPreset.CenterLeft);
+            icon.OffsetLeft = 14f;
+            icon.OffsetRight = 42f;
+            icon.OffsetTop = -14f;
+            icon.OffsetBottom = 14f;
+            item.AddChild(icon);
+            icons.Add(icon);
+        });
+        if (core == null)
+        {
+            return null;
+        }
+        RefreshIcons();
+        return new MultiHandle(core.Root, values =>
+        {
+            for (int i = 0; i < isChecked.Length; i++)
+            {
+                isChecked[i] = i < values.Count && values[i];
+            }
+            RefreshIcons();
+            core.SetDisplayValue(Summary());
+        });
+    }
+
+    /// <summary>What BuildCore hands back to TryBuild/TryBuildMulti - the root to add to a layout plus the
+    /// open/label/disabled controls both variants share.</summary>
+    private sealed record Core(Control Root, Action<bool> SetOpen, Action<string> SetDisplayValue, Action<bool> SetDisabled);
+
+    /// <summary>
+    /// The scene instantiation and open/close/reparent/mutual-exclusion wiring shared by TryBuild and TryBuildMulti
+    /// (see TryBuild's own doc for all of it). initialValue is the text the closed box starts with. onItemPressed
+    /// (index, item) runs when an item emits Selected - each variant decides there whether to close. onReady gets
+    /// the displayed text once the deferred layout refresh has run (TryBuild's "fires once immediately" contract);
+    /// decorateItem lets TryBuildMulti add its icon to each freshly instanced item.
+    /// </summary>
+    private static Core? BuildCore(IReadOnlyList<string> options, string initialValue, Control? overlayParent,
+        Action<int, NDropdownItem> onItemPressed, Action<string>? onReady, Action<NDropdownItem>? decorateItem = null)
+    {
         try
         {
             PackedScene? dropdownScene = PreloadManager.Cache.GetScene(DropdownScenePath);
@@ -139,7 +274,7 @@ internal static class Sts2NativeDropdown
             // that calls Handle.SetValue synchronously right after TryBuild returns (e.g. LoadFrom restoring a
             // saved value, in the same frame as Build()) would see its own update silently overwritten a moment
             // later when the still-pending deferred callback fires and reapplies the stale startValue.
-            string currentValue = options.Contains(initialValue) ? initialValue : (options.Count > 0 ? options[0] : string.Empty);
+            string currentValue = initialValue;
 
             // Callers like MatchConditionsPanel now put several of these dropdowns on one screen at once (language/
             // game mode/player count/ascension) - without this, opening a second one while a first is still open
@@ -281,14 +416,6 @@ internal static class Sts2NativeDropdown
 
             closeCurrentlyOpen = () => SetOpen(false);
 
-            void SelectValue(string value)
-            {
-                currentValue = value;
-                currentLabel.SetTextAutoSize(value);
-                SetOpen(false);
-                onSelected(value);
-            }
-
             void SetDisplayValue(string value)
             {
                 currentValue = value;
@@ -305,15 +432,17 @@ internal static class Sts2NativeDropdown
                 }
             }
 
-            foreach (string option in options)
+            for (int i = 0; i < options.Count; i++)
             {
+                int index = i;
                 var item = itemScene.Instantiate<NDropdownItem>(PackedScene.GenEditState.Disabled);
                 // RichTextLabel.Text is a plain engine-native property (see class doc for why we use this instead
                 // of NDropdownItem.Text) - safe to set immediately, no dependency on _Ready() or scene-tree
                 // liveness, unlike NDropdownItem.Text/_label would have been.
-                item.GetNode<RichTextLabel>("RichLabel").Text = option;
+                item.GetNode<RichTextLabel>("RichLabel").Text = options[i];
+                decorateItem?.Invoke(item);
                 items.AddChild(item);
-                item.Connect(NDropdownItem.SignalName.Selected, Callable.From<NDropdownItem>(_ => SelectValue(option)));
+                item.Connect(NDropdownItem.SignalName.Selected, Callable.From<NDropdownItem>(_ => onItemPressed(index, item)));
             }
 
             // No script on "root" (see class doc) means no NClickableControl.Released to connect to for the
@@ -346,7 +475,7 @@ internal static class Sts2NativeDropdown
                 {
                     dropdownContainer.RefreshLayout();
                     currentLabel.SetTextAutoSize(currentValue);
-                    onSelected(currentValue);
+                    onReady?.Invoke(currentValue);
                 }
                 catch (Exception ex)
                 {
@@ -354,7 +483,7 @@ internal static class Sts2NativeDropdown
                 }
             }).CallDeferred();
 
-            return new Handle(root, SetDisplayValue, SetDisabled);
+            return new Core(root, SetOpen, SetDisplayValue, SetDisabled);
         }
         catch (Exception ex)
         {

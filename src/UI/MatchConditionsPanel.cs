@@ -60,11 +60,17 @@ public class MatchConditionsPanel : VBoxContainer
     private VBoxContainer? _communitySuggestionList;
     private Control? _communitySuggestionDismisser;
     private NativeDropdownField<string> _languageField = null!;
-    private NativeDropdownField<MatchMode>? _gameModeField;
+    // 런 종류 state lives here (one tick per option, same order as _gameModes); the dropdown (or the fallback
+    // checkboxes) only displays it - see TryToggleGameMode / SyncGameModeView.
+    private List<MatchMode> _gameModes = new();
+    private bool[] _gameModeTicked = Array.Empty<bool>();
+    private Sts2NativeDropdown.MultiHandle? _gameModeDropdown;
+    private List<CheckBox>? _gameModeFallbackBoxes;
     private NativeDropdownField<int>? _maxPlayersField;
     private NativeDropdownField<int>? _ascensionField;
     private VBoxContainer _ascensionSlot = null!;
-    private int _ascensionRowCeiling;
+    private NativeDropdownField<int>? _blitzAscensionField;
+    private AscensionLayout _ascensionLayout;
     private readonly MatchMode _fixedGameMode;
 
     public bool ShowGameMode { get; }
@@ -176,13 +182,17 @@ public class MatchConditionsPanel : VBoxContainer
                 gameModeOptions.Add((GameModeCompat.DreadDisplayName(), MatchMode.Dread));
             }
             gameModeOptions.Add((Loc.Get("커스텀"), MatchMode.Custom));
-            _gameModeField = NativeDropdownField<MatchMode>.BuildOrFallback(gameModeOptions, MatchMode.Standard, _ =>
-            {
-                UpdateMaxPlayersEnabled();
-                RebuildAscensionRowIfCeilingChanged();
-                SettingsChanged?.Invoke();
-            }, _overlayParent);
-            AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("런 종류"), _gameModeField.Control));
+
+            // Multi-select: any of the ticked run types is fine (see MatchSettings.GameModes). A dropdown with a
+            // checkbox per item, so the row keeps the same 320x64 box every other row has; plain checkboxes only if
+            // the native dropdown scene fails to load.
+            _gameModes = gameModeOptions.Select(option => option.Value).ToList();
+            _gameModeTicked = _gameModes.Select(mode => mode == MatchMode.Standard).ToArray();
+            List<string> gameModeLabels = gameModeOptions.Select(option => option.Label).ToList();
+            _gameModeDropdown = Sts2NativeDropdown.TryBuildMulti(gameModeLabels, _gameModeTicked, TryToggleGameMode, _overlayParent);
+            Control gameModeControl = _gameModeDropdown?.Control ?? BuildGameModeFallbackCheckboxes(gameModeLabels);
+            AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("런 종류"), gameModeControl,
+                tooltip: Loc.Get("여러 개를 고르면 그중 하나에 해당하는 방과 매칭됩니다. 2개 이상 고르면 호스트가 되지 않습니다."), overlayParent: _overlayParent));
             AddChild(Sts2ModalPanel.BuildSettingsDivider());
         }
 
@@ -397,31 +407,43 @@ public class MatchConditionsPanel : VBoxContainer
     /// </summary>
     private void BuildAscensionRow()
     {
-        int maxAscension = MatchTags.LocalMaxAscension(CurrentGameMode);
-        _ascensionRowCeiling = maxAscension;
-        _ascensionSlot.Visible = maxAscension > 0;
-        if (maxAscension <= 0)
-        {
-            return;
-        }
+        AscensionLayout layout = ComputeAscensionLayout();
+        _ascensionLayout = layout;
+        _ascensionSlot.Visible = layout.GeneralCeiling > 0 || layout.BlitzCeiling > 0;
 
+        if (layout.GeneralCeiling > 0)
+        {
+            _ascensionField = BuildAscensionDropdown(layout.GeneralCeiling);
+            _ascensionSlot.AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("승천 단계"), _ascensionField.Control));
+            _ascensionSlot.AddChild(Sts2ModalPanel.BuildSettingsDivider());
+        }
+        if (layout.BlitzCeiling > 0)
+        {
+            // Always titled "블리츠 승천 단계", even with Blitz alone (then it's the only ascension row) - makes clear
+            // it's Blitz's own ladder, not the regular multiplayer one.
+            _blitzAscensionField = BuildAscensionDropdown(layout.BlitzCeiling);
+            _ascensionSlot.AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("블리츠 승천 단계"), _blitzAscensionField.Control));
+            _ascensionSlot.AddChild(Sts2ModalPanel.BuildSettingsDivider());
+        }
+    }
+
+    private NativeDropdownField<int> BuildAscensionDropdown(int maxAscension)
+    {
         var ascensionOptions = new List<(string Label, int Value)>();
         for (int level = maxAscension; level >= 0; level--)
         {
             ascensionOptions.Add((level == 0 ? Loc.Get("승천 없음") : string.Format(Loc.Get("승천 {0}"), level), level));
         }
         ascensionOptions.Add((Loc.Get("무관"), MatchTags.AscensionAny));
-        _ascensionField = NativeDropdownField<int>.BuildOrFallback(ascensionOptions, maxAscension, overlayParent: _overlayParent);
-        _ascensionSlot.AddChild(Sts2ModalPanel.BuildSettingsRow(Loc.Get("승천 단계"), _ascensionField.Control));
-        _ascensionSlot.AddChild(Sts2ModalPanel.BuildSettingsDivider());
+        return NativeDropdownField<int>.BuildOrFallback(ascensionOptions, maxAscension, overlayParent: _overlayParent);
     }
 
-    /// <summary>Blitz keeps its own ascension ceiling (Progress.MaxBlitzAscension), so switching 런 종류 to/from it
-    /// can change which levels are real choices - rebuild the row (back to the new ceiling as its default, same as
-    /// a fresh open) only when the ceiling actually differs.</summary>
+    /// <summary>Rebuilds the ascension rows (back to each ceiling as its default, same as a fresh open) only when
+    /// ticking/unticking a run type actually changes which rows exist or their ceilings - toggling e.g. 데일리
+    /// next to 스탠다드 keeps whatever level was already picked.</summary>
     private void RebuildAscensionRowIfCeilingChanged()
     {
-        if (MatchTags.LocalMaxAscension(CurrentGameMode) == _ascensionRowCeiling)
+        if (ComputeAscensionLayout() == _ascensionLayout)
         {
             return;
         }
@@ -431,20 +453,103 @@ public class MatchConditionsPanel : VBoxContainer
             child.QueueFree();
         }
         _ascensionField = null;
+        _blitzAscensionField = null;
         BuildAscensionRow();
     }
 
-    private MatchMode CurrentGameMode => _gameModeField?.Value ?? _fixedGameMode;
+    /// <summary>Which ascension rows the ticked run types need. Regular row: Standard/Daily/Custom, which all share
+    /// Progress.MaxMultiplayerAscension (the lowest is taken anyway, so an exact pick is reachable in each). Blitz
+    /// row: Blitz's own ladder (Progress.MaxBlitzAscension). Dread needs neither - fixed A10, no pick applies (see
+    /// AscensionSearchFilter.For). A ceiling of 0 means that row isn't shown.</summary>
+    private AscensionLayout ComputeAscensionLayout()
+    {
+        int? general = null;
+        int blitz = 0;
+        foreach (MatchMode mode in SelectedGameModes)
+        {
+            if (mode == MatchMode.Dread)
+            {
+                continue;
+            }
+            int modeMax = MatchTags.LocalMaxAscension(mode);
+            if (mode == MatchMode.Blitz)
+            {
+                blitz = modeMax;
+                continue;
+            }
+            general = general.HasValue ? Math.Min(general.Value, modeMax) : modeMax;
+        }
+        return new AscensionLayout(general ?? 0, blitz);
+    }
+
+    private readonly record struct AscensionLayout(int GeneralCeiling, int BlitzCeiling);
+
+    /// <summary>A user tick/untick of one run type, from either the dropdown or the fallback checkboxes. Refuses
+    /// (returns false, state unchanged) to untick the last ticked one, since "no run type" would match nothing.</summary>
+    private bool TryToggleGameMode(int index, bool ticked)
+    {
+        if (!ticked && _gameModeTicked.Count(t => t) <= 1)
+        {
+            return false;
+        }
+        _gameModeTicked[index] = ticked;
+        UpdateMaxPlayersEnabled();
+        RebuildAscensionRowIfCeilingChanged();
+        SettingsChanged?.Invoke();
+        return true;
+    }
+
+    /// <summary>Pushes _gameModeTicked into whichever view exists - for restores (LoadFrom), which don't go through
+    /// TryToggleGameMode.</summary>
+    private void SyncGameModeView()
+    {
+        _gameModeDropdown?.SetChecked(_gameModeTicked);
+        if (_gameModeFallbackBoxes != null)
+        {
+            for (int i = 0; i < _gameModeFallbackBoxes.Count; i++)
+            {
+                _gameModeFallbackBoxes[i].SetPressedNoSignal(_gameModeTicked[i]);
+            }
+        }
+    }
+
+    /// <summary>Only if Sts2NativeDropdown.TryBuildMulti failed (native scene didn't load): one plain settings
+    /// checkbox per run type in a 2-column grid. Taller and wider than the other rows, but still works.</summary>
+    private Control BuildGameModeFallbackCheckboxes(List<string> labels)
+    {
+        var grid = new GridContainer { Columns = 2, CustomMinimumSize = new Vector2(320f, 0f) };
+        grid.AddThemeConstantOverride("h_separation", 24);
+        grid.AddThemeConstantOverride("v_separation", 4);
+        _gameModeFallbackBoxes = new List<CheckBox>();
+        for (int i = 0; i < labels.Count; i++)
+        {
+            int index = i;
+            var box = new CheckBox { Text = labels[i], ButtonPressed = _gameModeTicked[i] };
+            Sts2ModalPanel.StyleAsSettingsOptionCheckbox(box);
+            box.SetHSizeFlags(SizeFlags.ExpandFill);
+            box.Toggled += pressed =>
+            {
+                if (!TryToggleGameMode(index, pressed))
+                {
+                    box.SetPressedNoSignal(!pressed);
+                }
+            };
+            _gameModeFallbackBoxes.Add(box);
+            grid.AddChild(box);
+        }
+        return grid;
+    }
 
     private void UpdateMaxPlayersEnabled()
     {
-        if (_gameModeField == null || _maxPlayersField == null)
+        if (_gameModes.Count == 0 || _maxPlayersField == null)
         {
             return;
         }
         // Daily hosting always forces 4 players internally (see MatchHostService) - the selector would be misleading.
-        bool isDaily = _gameModeField.Value == MatchMode.Daily;
-        _maxPlayersField.Disabled = isDaily;
+        // Only when Daily is the sole pick: with others ticked too, 인원 수 still filters those.
+        List<MatchMode> modes = SelectedGameModes;
+        _maxPlayersField.Disabled = modes.Count == 1 && modes[0] == MatchMode.Daily;
     }
 
     public string Community => _communityInput.Text;
@@ -454,12 +559,21 @@ public class MatchConditionsPanel : VBoxContainer
     /// <summary>Always AscensionAny for a player with nothing unlocked - the row isn't built for them at all.</summary>
     public int SelectedAscension => _ascensionField?.Value ?? MatchTags.AscensionAny;
 
+    /// <summary>Blitz's own pick (see MatchSettings.BlitzAscension) - AscensionAny when its row isn't shown.</summary>
+    public int SelectedBlitzAscension => _blitzAscensionField?.Value ?? MatchTags.AscensionAny;
+
     /// <summary>Always required - no longer a user-facing toggle (mismatched mods breaking a run isn't something
     /// anyone would deliberately opt out of), but MatchSettings.RequireModMatch and everything downstream that
     /// reads it (tagging, search filters) is untouched.</summary>
     public bool RequireModMatch => true;
 
-    public MatchMode SelectedGameMode => _gameModeField?.Value ?? MatchMode.Standard;
+    /// <summary>Ticked run types in display order; the room's own fixed mode when the row isn't shown
+    /// (MatchConditionsWindow).</summary>
+    public List<MatchMode> SelectedGameModes => _gameModes.Count == 0
+        ? new List<MatchMode> { _fixedGameMode }
+        : _gameModes.Where((_, i) => _gameModeTicked[i]).ToList();
+
+    public bool HasMultipleGameModes => SelectedGameModes.Count > 1;
     public int SelectedMaxPlayers => _maxPlayersField?.Value ?? MatchHostService.DefaultMaxPlayers;
 
     /// <summary>Does NOT call RecentCommunityStore.Record - that's the debounce timer's job (and the suggestion-
@@ -475,9 +589,10 @@ public class MatchConditionsPanel : VBoxContainer
         settings.Language = Language;
         settings.RequireModMatch = RequireModMatch;
         settings.Ascension = SelectedAscension;
+        settings.BlitzAscension = SelectedBlitzAscension;
         if (ShowGameMode)
         {
-            settings.GameMode = SelectedGameMode;
+            settings.GameModes = SelectedGameModes;
         }
         if (ShowMaxPlayers)
         {
@@ -495,9 +610,20 @@ public class MatchConditionsPanel : VBoxContainer
     {
         _communityInput.Text = settings.Community;
 
-        if (_gameModeField != null)
+        if (_gameModes.Count > 0)
         {
-            _gameModeField.SetValue(settings.GameMode);
+            // A restore, not a user change (see SettingsChanged's own doc) - no TryToggleGameMode. A saved mode
+            // this player can't pick anymore (e.g. Blitz on a build/save without it) simply has no option; if
+            // nothing saved is left, fall back to Standard so at least one stays ticked.
+            for (int i = 0; i < _gameModes.Count; i++)
+            {
+                _gameModeTicked[i] = settings.GameModes.Contains(_gameModes[i]);
+            }
+            if (!_gameModeTicked.Any(t => t))
+            {
+                _gameModeTicked[_gameModes.IndexOf(MatchMode.Standard)] = true;
+            }
+            SyncGameModeView();
             RebuildAscensionRowIfCeilingChanged();
         }
         if (_maxPlayersField != null)

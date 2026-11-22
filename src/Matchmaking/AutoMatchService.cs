@@ -75,8 +75,8 @@ public static class AutoMatchService
 
                 using var searchCts = CancellationTokenSource.CreateLinkedTokenSource(cancelToken);
                 Task<List<MatchLobbyInfo>> searchTask = MatchSearchService.SearchWithProgressiveRegionAsync(
-                    settings.Community, settings.RequireModMatch, SearchMaxPlayers(settings), MatchTags.KindFresh, settings.Language, settings.GameMode,
-                    AscensionSearchFilter.For(settings.Ascension, settings.GameMode), searchCts.Token);
+                    settings.Community, settings.RequireModMatch, SearchMaxPlayers(settings), MatchTags.KindFresh, settings.Language, settings.GameModes,
+                    settings.AscensionFor, searchCts.Token);
 
                 Task winner = await Task.WhenAny(guestLoopTask, searchTask);
                 if (winner == guestLoopTask)
@@ -97,7 +97,9 @@ public static class AutoMatchService
                     return AutoMatchResult.Join(found[0].LobbyId);
                 }
 
-                if (!settings.CanHost)
+                // Several run types picked: there's no single mode to open a room as, so this player only ever
+                // joins (MatchmakingWindow also unticks/disables 호스트 허용 for it - this is the backstop).
+                if (!settings.CanHost || settings.HasMultipleGameModes)
                 {
                     // No extra fixed delay here - a full progressive-region search pass already took a while, and
                     // adding a flat wait on top of it just stacked further behind the guest loop's own cadence
@@ -112,8 +114,8 @@ public static class AutoMatchService
                 // guest win during these ~6-8s wasn't noticed until the whole recheck finished.
                 using var recheckCts = CancellationTokenSource.CreateLinkedTokenSource(cancelToken);
                 Task<List<MatchLobbyInfo>> recheckTask = MatchSearchService.SearchWithProgressiveRegionAsync(
-                    settings.Community, settings.RequireModMatch, SearchMaxPlayers(settings), MatchTags.KindFresh, settings.Language, settings.GameMode,
-                    AscensionSearchFilter.For(settings.Ascension, settings.GameMode), recheckCts.Token);
+                    settings.Community, settings.RequireModMatch, SearchMaxPlayers(settings), MatchTags.KindFresh, settings.Language, settings.GameModes,
+                    settings.AscensionFor, recheckCts.Token);
 
                 Task recheckWinner = await Task.WhenAny(guestLoopTask, recheckTask);
                 if (recheckWinner == guestLoopTask)
@@ -238,7 +240,7 @@ public static class AutoMatchService
         }
 
         Log.Info("[sts2_matchmaker] AutoMatch found nothing, becoming host");
-        HostResult hostResult = await MatchHostService.StartFreshHostAsync(stack, settings.Community, ResolveHostLanguage(settings), settings.GameMode, ResolveHostMaxPlayers(settings), settings.Ascension, openMatchingWindowOnHost: true);
+        HostResult hostResult = await MatchHostService.StartFreshHostAsync(stack, settings.Community, ResolveHostLanguage(settings), settings.HostGameMode, ResolveHostMaxPlayers(settings), settings.AscensionFor(settings.HostGameMode), openMatchingWindowOnHost: true);
         return hostResult.Error != null ? AutoMatchResult.Fail(hostResult.Error) : AutoMatchResult.Host(hostResult);
     }
 

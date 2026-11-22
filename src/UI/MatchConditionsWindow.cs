@@ -178,7 +178,7 @@ public class MatchConditionsWindow : Sts2ModalPanel
             // same saved setting the same way for the auto-stop-when-full check.
             MatchLobbyTagging.ApplyTags(lobbyId, settings.Community, language, GameModeCompat.FromLobby(_lobby),
                 MatchLobbyTagging.ResolveRoomMaxPlayers(SteamMatchmaking.GetLobbyMemberLimit(lobbyId), settings.MaxPlayers), MatchTags.KindFresh,
-                MatchLobbyTagging.ResolveRoomAscension(_lobby.MaxAscension, settings.Ascension));
+                MatchLobbyTagging.ResolveRoomAscension(_lobby.MaxAscension, settings.AscensionFor(GameModeCompat.FromLobby(_lobby))));
             _ = BanTagSync.MergeMyBansIntoLobbyAsync(lobbyId);
             Log.Info($"[sts2_matchmaker] Opened existing lobby {lobbyIdValue} to matchmaking search");
             // This window only ever exists for a room that already exists (host already committed) - being open to

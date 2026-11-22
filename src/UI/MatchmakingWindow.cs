@@ -42,6 +42,9 @@ public class MatchmakingWindow : Sts2ModalPanel
 
     private MatchConditionsPanel _conditions = null!;
     private CheckBox _canHostCheck = null!;
+    // What 호스트 허용 was set to before ticking a second run type forced it off - restored (and kept in the saved
+    // settings) once back to a single run type, so a multi-mode search doesn't silently wipe the player's choice.
+    private bool _canHostPreference;
     private NConfirmButton? _confirmButton;
     private NBackButton? _cancelButton;
     private Button _rehostWaitButton = null!;
@@ -89,14 +92,24 @@ public class MatchmakingWindow : Sts2ModalPanel
         MatchSettings saved = MatchSettingsStore.Load();
         _conditions.LoadFrom(saved);
         _canHostCheck.ButtonPressed = saved.CanHost;
+        _canHostPreference = saved.CanHost;
+        UpdateCanHostEnabled();
 
         // Save on every actual change, not just at confirm/close - see MatchConditionsPanel.SettingsChanged's own
         // doc for why relying solely on button presses lost changes whenever the window closed some other way
         // (e.g. cancelling a search then backing out through the game's own menu navigation instead of this
         // window's close button). Wired after the LoadFrom/ButtonPressed restores above so replaying the just-
         // loaded values back into the store isn't mistaken for a real change.
-        _conditions.SettingsChanged += SaveCurrentSettings;
-        _canHostCheck.Toggled += _ => SaveCurrentSettings();
+        _conditions.SettingsChanged += () =>
+        {
+            UpdateCanHostEnabled();
+            SaveCurrentSettings();
+        };
+        _canHostCheck.Toggled += pressed =>
+        {
+            _canHostPreference = pressed;
+            SaveCurrentSettings();
+        };
 
         // Row style matches settings_screen.tscn's own "Send Feedback" row exactly now (BuildSettingsRow: label
         // left, button right in a 64px MarginContainer; BuildSettingsActionButton: same reward_skip_button.png
@@ -166,8 +179,19 @@ public class MatchmakingWindow : Sts2ModalPanel
     {
         MatchSettings settings = new();
         _conditions.ApplyTo(settings);
-        settings.CanHost = _canHostCheck.ButtonPressed;
+        settings.CanHost = _canHostPreference;
         MatchSettingsStore.Save(settings);
+    }
+
+    /// <summary>With two or more run types ticked there's no single mode to open a room as, so 호스트 허용 is
+    /// unticked and locked (AutoMatchService also refuses to host then). Dimmed by Modulate since the settings
+    /// checkbox art has no separate disabled look. Back to one run type restores _canHostPreference.</summary>
+    private void UpdateCanHostEnabled()
+    {
+        bool multi = _conditions.HasMultipleGameModes;
+        _canHostCheck.Disabled = multi;
+        _canHostCheck.SetPressedNoSignal(!multi && _canHostPreference);
+        _canHostCheck.Modulate = multi ? new Color(1f, 1f, 1f, 0.4f) : Colors.White;
     }
 
     private void ApplyPendingUiState() => ApplyConfirmCancelState(_pendingCts != null, _confirmButton, _cancelButton);
@@ -224,7 +248,7 @@ public class MatchmakingWindow : Sts2ModalPanel
         {
             var settings = new MatchSettings();
             _conditions.ApplyTo(settings);
-            settings.CanHost = _canHostCheck.ButtonPressed;
+            settings.CanHost = _canHostCheck.ButtonPressed; // already false while several run types are ticked
 
             AutoMatchResult result = await AutoMatchService.AutoMatchAsync(_stack, settings, cancelToken);
             HandleAutoMatchResult(result);

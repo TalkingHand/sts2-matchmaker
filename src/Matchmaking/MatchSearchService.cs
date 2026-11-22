@@ -58,8 +58,11 @@ public readonly struct AscensionSearchFilter
     /// the people who were in that save (and who therefore already cleared its ascension).</summary>
     public static AscensionSearchFilter None => new(null, null);
 
+    /// <summary>Dread ignores the preference entirely: every Dread room is tagged 0 (fixed A10 - see
+    /// MatchLobbyTagging.ApplyTags), and with several run types picked the chosen level only applies to the
+    /// others.</summary>
     public static AscensionSearchFilter For(int preferredAscension, MatchMode gameMode) =>
-        preferredAscension == MatchTags.AscensionAny
+        preferredAscension == MatchTags.AscensionAny || gameMode == MatchMode.Dread
             ? new AscensionSearchFilter(null, MatchTags.LocalMaxAscension(gameMode))
             : new AscensionSearchFilter(preferredAscension, null);
 }
@@ -220,6 +223,10 @@ public static class MatchSearchService
     /// turn-based, so ping isn't expected to be a real problem; revisit with actual data if it turns out to be),
     /// pausing briefly between tiers, and returns as soon as a tier finds anything (or whatever the last tier
     /// found, even if empty, once all tiers are exhausted).
+    ///
+    /// Several run types: Steam's lobby filter only does equality on one value per key, so each tier queries every
+    /// picked mode in turn (with that mode's own ascension filter - see AscensionSearchFilter.For) before widening,
+    /// keeping "nearest first" across all of them rather than exhausting one mode worldwide before trying the next.
     /// </summary>
     public static async Task<List<MatchLobbyInfo>> SearchWithProgressiveRegionAsync(
         string? communityFilter,
@@ -227,14 +234,19 @@ public static class MatchSearchService
         int? maxPlayers,
         string kind,
         string? language,
-        MatchMode gameMode,
-        AscensionSearchFilter ascension = default,
+        IReadOnlyList<MatchMode> gameModes,
+        Func<MatchMode, int> preferredAscensionFor,
         CancellationToken cancelToken = default)
     {
         for (int i = 0; i < RegionTiersNearToFar.Length; i++)
         {
-            List<MatchLobbyInfo> results = await SearchAsync(
-                communityFilter, requireModMatch, maxPlayers, kind, language, RegionTiersNearToFar[i], gameMode, ascension, cancelToken: cancelToken);
+            var results = new List<MatchLobbyInfo>();
+            foreach (MatchMode gameMode in gameModes)
+            {
+                results.AddRange(await SearchAsync(
+                    communityFilter, requireModMatch, maxPlayers, kind, language, RegionTiersNearToFar[i], gameMode,
+                    AscensionSearchFilter.For(preferredAscensionFor(gameMode), gameMode), cancelToken: cancelToken));
+            }
             bool isLastTier = i == RegionTiersNearToFar.Length - 1;
             if (results.Count > 0 || isLastTier)
             {

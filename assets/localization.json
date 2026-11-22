@@ -1534,5 +1534,37 @@
     "spa": "Apodo (opcional)",
     "tha": "ชื่อเล่น (ไม่บังคับ)",
     "tur": "Takma ad (isteğe bağlı)"
+  },
+  "여러 개를 고르면 그중 하나에 해당하는 방과 매칭됩니다. 2개 이상 고르면 호스트가 되지 않습니다.": {
+    "eng": "Matches rooms of any of the checked run types. With 2 or more checked, you won't become host.",
+    "zhs": "将匹配任一已勾选类型的房间。勾选2项及以上时不会成为房主。",
+    "zht": "將配對任一已勾選類型的房間。勾選2項以上時不會成為房主。",
+    "deu": "Findet Räume mit einer der markierten Run-Arten. Bei 2 oder mehr wirst du kein Host.",
+    "esp": "Empareja salas de cualquiera de los tipos marcados. Con 2 o más marcados, no serás anfitrión.",
+    "fra": "Trouve des salons de l'un des types cochés. Avec 2 types ou plus, vous ne deviendrez pas hôte.",
+    "ita": "Trova stanze di uno qualsiasi dei tipi selezionati. Con 2 o più selezionati, non diventerai host.",
+    "jpn": "チェックしたいずれかの種類の部屋とマッチングします。2つ以上選ぶとホストにはなりません。",
+    "pol": "Dopasowuje pokoje dowolnego z zaznaczonych typów. Przy 2 lub więcej nie zostaniesz hostem.",
+    "ptb": "Encontra salas de qualquer um dos tipos marcados. Com 2 ou mais marcados, você não será anfitrião.",
+    "rus": "Подбирает комнаты любого из отмеченных типов. Если отмечено 2 и более, вы не станете хостом.",
+    "spa": "Empareja salas de cualquiera de los tipos marcados. Con 2 o más marcados, no serás anfitrión.",
+    "tha": "จับคู่กับห้องประเภทใดก็ได้ที่เลือกไว้ หากเลือกตั้งแต่ 2 ประเภทขึ้นไป จะไม่เป็นโฮสต์",
+    "tur": "İşaretlenen koşu türlerinden herhangi birinin odasıyla eşleşir. 2 veya daha fazla seçiliyken host olmazsınız."
+  },
+  "블리츠 승천 단계": {
+    "eng": "Blitz Ascension Level",
+    "zhs": "闪电战苦难等级",
+    "zht": "閃電戰苦難等級",
+    "deu": "Blitz-Aufstiegsstufe",
+    "esp": "Nivel de ascensión de Blitz",
+    "fra": "Niveau d'ascension Blitz",
+    "ita": "Livello di ascensione Blitz",
+    "jpn": "ブリッツ アセンションレベル",
+    "pol": "Poziom wstąpienia Blitz",
+    "ptb": "Nível de ascensão Blitz",
+    "rus": "Уровень восхождения в блице",
+    "spa": "Nivel de ascensión de Blitz",
+    "tha": "ระดับ Ascension บลิทซ์",
+    "tur": "Blitz Yükseliş Seviyesi"
   }
 }

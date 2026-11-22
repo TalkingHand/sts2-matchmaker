@@ -1229,6 +1229,11 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
     /// checked/unchecked/radio_checked/radio_unchecked icon slots, so this needs no custom drawing - just point it
     /// at the real assets instead of leaving the default engine checkbox glyph.
     /// </summary>
+    /// <summary>The same checkbox art StyleAsSettingsCheckbox uses, for drawing a tick outside a CheckBox (e.g.
+    /// Sts2NativeDropdown.TryBuildMulti's per-item icons). Null if the asset fails to load.</summary>
+    internal static Texture2D? LoadCheckboxTexture(bool ticked) =>
+        GD.Load<Texture2D>(ticked ? CheckboxTickedTexturePath : CheckboxUntickedTexturePath);
+
     internal static void StyleAsSettingsCheckbox(CheckBox checkBox)
     {
         Texture2D? ticked = GD.Load<Texture2D>(CheckboxTickedTexturePath);
@@ -1246,6 +1251,25 @@ public abstract class Sts2ModalPanel : Control, IScreenContext
         checkBox.AddThemeColorOverride("font_color", StsColors.cream);
         checkBox.AddThemeColorOverride("font_hover_color", StsColors.gold);
         checkBox.AddThemeConstantOverride("h_separation", 12);
+    }
+
+    /// <summary>A settings-styled checkbox that carries its own text label (e.g. one run type in 런 종류's
+    /// multi-select) rather than sitting alone on the right of a row: same icons as StyleAsSettingsCheckbox, plus
+    /// the row label's regular font so Korean/CJK text gets the game's substitute font instead of Godot's default.
+    /// The disabled icons are the same art as the enabled ones, so a disabled box is dimmed via Modulate by its
+    /// owner instead.</summary>
+    internal static void StyleAsSettingsOptionCheckbox(CheckBox checkBox, int fontSize = 24)
+    {
+        StyleAsSettingsCheckbox(checkBox);
+        checkBox.AddThemeColorOverride("font_pressed_color", StsColors.cream);
+        checkBox.AddThemeColorOverride("font_hover_pressed_color", StsColors.gold);
+        checkBox.AddThemeColorOverride("font_focus_color", StsColors.cream);
+        Font? regularFont = ResolveFont(BodyFontPath, FontType.Regular);
+        if (regularFont != null)
+        {
+            checkBox.AddThemeFontOverride("font", regularFont);
+        }
+        checkBox.AddThemeFontSizeOverride("font_size", fontSize);
     }
 
     // Colors lifted directly from the settings screen's own dropdown (settings_dropdown.tscn +

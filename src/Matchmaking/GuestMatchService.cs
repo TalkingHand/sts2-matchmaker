@@ -36,7 +36,7 @@ public static class GuestMatchService
         IEnumerable<GuestLobby> candidates = lobbies
             .Where(lobby => !lobby.IsRehost && MatchesFreshCriteria(lobby, settings))
             .OrderBy(ParseNo);
-        return await TryJoinCandidatesAsync(stack, candidates, settings.GameMode, cancelToken);
+        return await TryJoinCandidatesAsync(stack, candidates, settings.GameModes, cancelToken);
     }
 
     /// <summary>Rehost-wait entry point: only is_rehost posts, no other filtering - unlike this mod's own
@@ -48,13 +48,13 @@ public static class GuestMatchService
         IReadOnlyList<GuestLobby> lobbies = await GuestLobbyListClient.GetAsync(cancelToken);
         GuestDeadCandidateTracker.Prune(lobbies);
         IEnumerable<GuestLobby> candidates = lobbies.Where(lobby => lobby.IsRehost).OrderBy(ParseNo);
-        return await TryJoinCandidatesAsync(stack, candidates, expectedMode: null, cancelToken);
+        return await TryJoinCandidatesAsync(stack, candidates, expectedModes: null, cancelToken);
     }
 
-    /// <param name="expectedMode">Fresh matching only: the run type the player asked for, re-checked against the
-    /// screen the join actually landed on (see JoinedModeMismatch). Null for rehost, whose load screen is shared
+    /// <param name="expectedModes">Fresh matching only: the run types the player asked for (any of them), re-checked
+    /// against the screen the join actually landed on (see JoinedMode). Null for rehost, whose load screen is shared
     /// across modes and whose candidates are already the player's own save.</param>
-    private static async Task<CSteamID?> TryJoinCandidatesAsync(NSubmenuStack stack, IEnumerable<GuestLobby> sortedCandidates, MatchMode? expectedMode, CancellationToken cancelToken)
+    private static async Task<CSteamID?> TryJoinCandidatesAsync(NSubmenuStack stack, IEnumerable<GuestLobby> sortedCandidates, IReadOnlyCollection<MatchMode>? expectedModes, CancellationToken cancelToken)
     {
         foreach (GuestLobby lobby in sortedCandidates)
         {
@@ -129,9 +129,9 @@ public static class GuestMatchService
             try
             {
                 await MatchJoinService.JoinLobbyAsync(stack, lobbyId, suppressErrorPopup: true);
-                if (expectedMode is { } wanted && JoinedMode(stack) is { } actual && actual != wanted)
+                if (expectedModes != null && JoinedMode(stack) is { } actual && !expectedModes.Contains(actual))
                 {
-                    Log.Info($"[sts2_matchmaker] Guest candidate {lobbyIdValue} (no={lobby.No}) turned out to be {actual}, not {wanted} - leaving");
+                    Log.Info($"[sts2_matchmaker] Guest candidate {lobbyIdValue} (no={lobby.No}) turned out to be {actual}, not {string.Join("/", expectedModes)} - leaving");
                     GuestDeadCandidateTracker.MarkDead(lobby.No);
                     LeaveJoinedLobby(stack);
                     continue;
@@ -211,11 +211,15 @@ public static class GuestMatchService
 
     private static bool MatchesFreshCriteria(GuestLobby lobby, MatchSettings settings)
     {
-        if (!string.Equals(lobby.GameMode, settings.GameMode.ToString(), StringComparison.OrdinalIgnoreCase))
+        if (!settings.GameModes.Any(mode => string.Equals(lobby.GameMode, mode.ToString(), StringComparison.OrdinalIgnoreCase)))
         {
             return false;
         }
-        if (settings.Ascension != MatchTags.AscensionAny && !AscensionInRange(lobby, settings.Ascension))
+        // Blitz has its own pick (MatchSettings.BlitzAscension); Dread is fixed at A10, so no pick applies to it
+        // (see AscensionSearchFilter.For).
+        Enum.TryParse(lobby.GameMode, ignoreCase: true, out MatchMode lobbyMode);
+        int wantedAscension = settings.AscensionFor(lobbyMode);
+        if (lobbyMode != MatchMode.Dread && wantedAscension != MatchTags.AscensionAny && !AscensionInRange(lobby, wantedAscension))
         {
             return false;
         }
