@@ -2,7 +2,7 @@
   "title": "Match Maker",
   "description": "A mod that improves multiplayer convenience and adds automatic matchmaking.\nMatch multiplayer lobbies based on community name / language / ascension / player count / installed mods, or use quick rehosting and kick/ban features.\n\nDoesn't affect gameplay, so you can freely play with people who don't have it installed.\n\nhttps://github.com/TalkingHand/sts2-matchmaker",
   "visibility": "public",
-  "changeNote": "Run type is now a multi-select dropdown: tick several run types and you'll be matched into a room of any of them. With 2 or more ticked you won't become host (\"Allow Hosting\" is unticked and locked), since there's no single run type to open a room as. When Blitz is ticked, it gets its own \"Blitz Ascension Level\" row, because Blitz unlocks ascension separately from the other run types.",
+  "changeNote": "When a match is found, the game window now comes to the front (restored if minimized) and its taskbar icon flashes, so you notice the match even while you're in another window. If Windows doesn't allow the window to come to the front, the taskbar flash still lets you know.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
