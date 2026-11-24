@@ -20,6 +20,7 @@ public static class MatchSfx
     /// live tree) and frees it once playback finishes, so nothing lingers after the sound is done.</summary>
     public static void PlayMatchFoundSfx(Node liveParent)
     {
+        WindowAttention.Request();
         AudioStream? stream = GD.Load<AudioStream>(MatchFoundSfxPath);
         if (stream == null)
         {
