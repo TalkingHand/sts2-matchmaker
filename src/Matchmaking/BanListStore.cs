@@ -92,6 +92,7 @@ public static class BanListStore
             var config = new ConfigFile();
             config.Load(ConfigPath); // best-effort - keep existing entries
             config.SetValue(Section, steamId.ToString(), $"{nickname ?? string.Empty}{FieldSeparator}{reason ?? string.Empty}");
+            ModConfigDir.Ensure();
             Error err = config.Save(ConfigPath);
             if (err != Error.Ok)
             {
@@ -107,6 +108,7 @@ public static class BanListStore
             var config = new ConfigFile();
             config.Load(ConfigPath);
             config.EraseSectionKey(Section, steamId.ToString());
+            ModConfigDir.Ensure();
             Error err = config.Save(ConfigPath);
             if (err != Error.Ok)
             {
@@ -153,6 +155,7 @@ public static class BanListStore
                 string nickname = string.IsNullOrEmpty(entry.Nickname) ? ResolveNickname(steamId) : entry.Nickname;
                 config.SetValue(Section, steamId.ToString(), $"{nickname}{FieldSeparator}{entry.Reason}");
             }
+            ModConfigDir.Ensure();
             Error err = config.Save(ConfigPath);
             if (err != Error.Ok)
             {

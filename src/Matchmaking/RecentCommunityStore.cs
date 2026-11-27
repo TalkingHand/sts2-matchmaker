@@ -54,6 +54,7 @@ public static class RecentCommunityStore
         var config = new ConfigFile();
         config.Load(ConfigPath); // best-effort - keep any unrelated sections/keys if the file already exists
         config.SetValue(Section, Key, recent.ToArray());
+        ModConfigDir.Ensure();
         Error err = config.Save(ConfigPath);
         if (err != Error.Ok)
         {

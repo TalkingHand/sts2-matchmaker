@@ -80,6 +80,7 @@ public static class MatchSettingsStore
         config.SetValue(Section, "game_mode", (int)settings.HostGameMode);
         // Ascension is deliberately NOT persisted here - see MatchSettings.Ascension's own doc.
 
+        ModConfigDir.Ensure();
         Error err = config.Save(ConfigPath);
         if (err != Error.Ok)
         {
