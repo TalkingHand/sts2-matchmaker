@@ -2,7 +2,7 @@
   "title": "Match Maker",
   "description": "A mod that improves multiplayer convenience and adds automatic matchmaking.\nMatch multiplayer lobbies based on community name / language / ascension / player count / installed mods, or use quick rehosting and kick/ban features.\n\nDoesn't affect gameplay, so you can freely play with people who don't have it installed.\n\nhttps://github.com/TalkingHand/sts2-matchmaker",
   "visibility": "public",
-  "changeNote": "When a match is found, the game window now comes to the front (restored if minimized) and its taskbar icon flashes, so you notice the match even while you're in another window. If Windows doesn't allow the window to come to the front, the taskbar flash still lets you know.",
+  "changeNote": "Fixed match settings, ban list and recent communities resetting after a restart. They could not be saved when the game's mod_configs folder did not exist yet (common if you don't use other mods that create it).",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
